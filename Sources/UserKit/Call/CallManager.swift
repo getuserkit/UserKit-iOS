@@ -363,7 +363,7 @@ class CallManager {
         await webRTCClient.close()
         
         do {
-            let message: [String: Any] = ["type": "participantLeft"]
+            let message: [String: Any] = ["type": "call.participant.end"]
             let jsonData = try JSONSerialization.data(withJSONObject: message, options: .prettyPrinted)
             guard let json = String(data: jsonData, encoding: .utf8) else {
                 enum UserKitError: Error { case invalidJSON }
