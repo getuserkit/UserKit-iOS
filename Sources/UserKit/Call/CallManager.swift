@@ -173,7 +173,7 @@ class CallManager {
             self.sessionId = response.sessionId
                         
         } catch {
-            assertionFailure("Failed to join call: \(error.localizedDescription)")
+            assertionFailure("Failed to join call: \(error)")
         }
                 
         await pushTracks()
@@ -245,7 +245,7 @@ class CallManager {
             try post(message: message)
             
         } catch {
-            assertionFailure("Failed to join call: \(error.localizedDescription)")
+            assertionFailure("Failed to join call: \(error)")
         }
                 
         // Pull and push tracks
@@ -347,7 +347,7 @@ class CallManager {
             }
             webSocketClient.send(string: json)
         } catch {
-            assertionFailure("Failed to decline call: \(error.localizedDescription)")
+            assertionFailure("Failed to decline call: \(error)")
         }
     }
     
@@ -371,7 +371,7 @@ class CallManager {
             }
             webSocketClient.send(string: json)
         } catch {
-            assertionFailure("Failed to leave call: \(error.localizedDescription)")
+            assertionFailure("Failed to leave call: \(error)")
         }
     }
     
@@ -508,7 +508,7 @@ class CallManager {
                 as: APIClient.RenegotiateResponse.self
             )
         } catch {
-            assertionFailure("Failed to pull tracks: \(error.localizedDescription)")
+            assertionFailure("Failed to pull tracks: \(error)")
         }
     }
     
