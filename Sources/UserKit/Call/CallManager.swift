@@ -675,10 +675,6 @@ class CallManager {
             }
             
             let data: [String: Any] = [
-                "id": participant.id as Any,
-                "firstName": participant.firstName as Any,
-                "lastName": participant.lastName as Any,
-                "state": participant.state.rawValue,
                 "transceiverSessionId": participant.transceiverSessionId ?? "",
                 "tracks": participant.tracks.map { track in
                     [
@@ -690,8 +686,8 @@ class CallManager {
             ]
             
             let participantUpdate: [String: Any] = [
-                "type": "participantUpdate",
-                "participant": data
+                "type": "call.participant.tracks.update",
+                "data": data
             ]
             
             do {
@@ -742,11 +738,11 @@ class CallManager {
                 return
             }
             
+            guard let participant = call.participants.first(where: { $0.role == .user }) else {
+                return
+            }
+            
             let data: [String: Any] = [
-                "id": participant.id as Any,
-                "firstName": participant.firstName as Any,
-                "lastName": participant.lastName as Any,
-                "state": participant.state.rawValue,
                 "transceiverSessionId": participant.transceiverSessionId ?? "",
                 "tracks": participant.tracks.map { track in
                     [
@@ -758,8 +754,8 @@ class CallManager {
             ]
             
             let participantUpdate: [String: Any] = [
-                "type": "participantUpdate",
-                "participant": data
+                "type": "call.participant.tracks.update",
+                "data": data
             ]
             
             do {
