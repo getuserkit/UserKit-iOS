@@ -135,7 +135,7 @@ class UserManager {
             }
         } catch {
             self.state.mutate { $0 = .none }
-            assertionFailure("Failed to update user state \(error)")
+            assertionFailure("Failed to update user state \(error) \(state)")
         }
     }
 }
