@@ -116,6 +116,10 @@ class UserManager {
             case "userState":
                 update(state: json)
                 
+            case "call.ended":
+                // TODO: Handle call end
+                break
+                
             default:
                 print("Unknown message type: \(messageType)")
             }

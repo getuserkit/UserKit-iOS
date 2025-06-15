@@ -22,6 +22,7 @@ struct Call: Codable, Equatable {
     struct Participant: Codable, Equatable {
         enum State: String, Codable {
             case none
+            case initialized
             case declined
             case joined
         }
@@ -257,14 +258,7 @@ class CallManager {
             
             // Set session
             self.sessionId = response.sessionId
-            
-            // Update participant
-            let message: [String: Any] = [
-                "type": "call.participant.update",
-                "data": ["state": "joined"]
-            ]
-            try post(message: message)
-            
+                        
         } catch {
             assertionFailure("Failed to join call: \(error)")
         }
@@ -318,20 +312,6 @@ class CallManager {
             throw UserKitError.invalidJSON
         }
         webSocketClient.send(string: json)
-    }
-        
-    private func decline() async {
-        do {
-            let message: [String: Any] = ["type": "participantDeclined"]
-            let jsonData = try JSONSerialization.data(withJSONObject: message, options: .prettyPrinted)
-            guard let json = String(data: jsonData, encoding: .utf8) else {
-                enum UserKitError: Error { case invalidJSON }
-                throw UserKitError.invalidJSON
-            }
-            webSocketClient.send(string: json)
-        } catch {
-            assertionFailure("Failed to decline call: \(error)")
-        }
     }
     
     private func end() async {
@@ -560,7 +540,6 @@ class CallManager {
 
             switch user?.state {
             case nil, .some(.none):
-                break // TODO - Handle this better, an outgoing call inits a call object
                 addPictureInPictureViewController()
 
                 let name = call.participants.first(where: { $0.role == .host})?.firstName
@@ -568,17 +547,17 @@ class CallManager {
                 await presentAlert(title: "Incoming Call", message: message, options: [
                     UIAlertAction(title: "Join", style: .default) { [weak self] alertAction in
                         Task {
+                            try self?.post(message: ["type": "call.participant.accept", "data": ["uuid": call.uuid]])
                             await self?.join()
                         }
                     },
                     UIAlertAction(title: "Not Now", style: .cancel) { [weak self] alertAction in
                         Task {
-                            await self?.decline()
+                            try self?.post(message: ["type": "call.participant.decline", "data": ["uuid": call.uuid]])
                         }
                     }
                 ])
             case .joined:
-                break // TODO - Handle this better, an outgoing call inits a call object
                 addPictureInPictureViewController()
                 
                 let name = call.participants.first(where: { $0.role == .host})?.firstName
@@ -597,8 +576,12 @@ class CallManager {
                         }
                     ])
                 }
+            case .initialized:
+                // NOP
+                break
             case .declined:
-                print("user declined")
+                // NOP
+                break
             }
         case (.some(let oldCall), .some(let newCall)):
             guard let newUser = newCall.participants.first(where: { $0.role == .user }), newUser.state == .joined else {
