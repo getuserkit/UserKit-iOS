@@ -85,6 +85,7 @@ struct Call: Codable, Equatable {
         
         let state: State
     }
+    let uuid: String
     let participants: [Participant]
     let touchIndicator: TouchIndicator
 }
@@ -160,6 +161,9 @@ class CallManager {
                 endpoint: .postSession(.init()),
                 as: APIClient.PostSessionResponse.self
             )
+        
+            // Configure audio
+            configureAudioSession()
             
             // Configure WebRTC
             async let webRTCTask = webRTCClient.configure()
@@ -217,6 +221,20 @@ class CallManager {
         alertController.preferredAction = options.first
         viewController.present(alertController, animated: true)
     }
+    
+    private func configureAudioSession() {
+        let audioSession = RTCAudioSession.sharedInstance()
+        audioSession.lockForConfiguration()
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .videoChat, options: [.defaultToSpeaker])
+            audioSession.useManualAudio = true
+            audioSession.isAudioEnabled = true
+            try audioSession.setActive(true)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
+        audioSession.unlockForConfiguration()
+    }
         
     private func join() async {
         do {
@@ -226,9 +244,12 @@ class CallManager {
                 as: APIClient.PostSessionResponse.self
             )
             
+            // Configure audio
+            configureAudioSession()
+            
             // Configure WebRTC
             async let webRTCTask = webRTCClient.configure()
-        
+
             // Start Picture in Picture with loading state
             async let pictureInPictureTask: () = startPictureInPicture()
             
@@ -267,7 +288,7 @@ class CallManager {
             return [
                 "id": "\(sessionId)/\(id)",
                 "type": type,
-                "state": "inactive"
+                "state": type == "audio" ? "active" : "inactive"
             ]
         }
         
@@ -298,45 +319,7 @@ class CallManager {
         }
         webSocketClient.send(string: json)
     }
-    
-//    private func updateParticipant(state: Call.Participant.State) async throws {
-//        guard let sessionId = sessionId else {
-//            return
-//        }
-//        
-//        // Fetch the tracks
-//        let tracks: [[String: Any]] = await webRTCClient.getLocalTransceivers().compactMap { type, transceiver in
-//            guard let id = transceiver.sender.track?.trackId else {
-//                return nil
-//            }
-//            
-//            return [
-//                "id": "\(sessionId)/\(id)",
-//                "type": type,
-//                "state": "inactive"
-//            ]
-//        }
-//        
-//        // Update the participants join state
-//        let data: [String: Any] = [
-//            "state": Call.Participant.State.joined.rawValue,
-//            "transceiverSessionId": sessionId,
-//            "tracks": tracks
-//        ]
-//        
-//        let participantUpdate: [String: Any] = [
-//            "type": "participantUpdate",
-//            "participant": data
-//        ]
-//        
-//        let jsonData = try JSONSerialization.data(withJSONObject: participantUpdate, options: .prettyPrinted)
-//        guard let json = String(data: jsonData, encoding: .utf8) else {
-//            enum UserKitError: Error { case invalidJSON }
-//            throw UserKitError.invalidJSON
-//        }
-//        webSocketClient.send(string: json)
-//    }
-    
+        
     private func decline() async {
         do {
             let message: [String: Any] = ["type": "participantDeclined"]
@@ -352,8 +335,12 @@ class CallManager {
     }
     
     private func end() async {
+        let state = state.read({ $0 })
+        
         await stopPictureInPicture()
         await cameraClient.stop()
+        
+        removePictureInPictureViewController()
         
         if RPScreenRecorder.shared().isRecording {
             RPScreenRecorder.shared().stopCapture()
@@ -362,16 +349,21 @@ class CallManager {
         
         await webRTCClient.close()
         
-        do {
-            let message: [String: Any] = ["type": "call.participant.end"]
-            let jsonData = try JSONSerialization.data(withJSONObject: message, options: .prettyPrinted)
-            guard let json = String(data: jsonData, encoding: .utf8) else {
-                enum UserKitError: Error { case invalidJSON }
-                throw UserKitError.invalidJSON
+        switch state {
+        case .some(let call):
+            do {
+                let message: [String: Any] = ["type": "call.participant.end", "data": ["uuid": call.uuid]]
+                let jsonData = try JSONSerialization.data(withJSONObject: message, options: .prettyPrinted)
+                guard let json = String(data: jsonData, encoding: .utf8) else {
+                    enum UserKitError: Error { case invalidJSON }
+                    throw UserKitError.invalidJSON
+                }
+                webSocketClient.send(string: json)
+            } catch {
+                assertionFailure("Failed to leave call: \(error)")
             }
-            webSocketClient.send(string: json)
-        } catch {
-            assertionFailure("Failed to leave call: \(error)")
+        default:
+            break
         }
     }
     
