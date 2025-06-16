@@ -313,7 +313,7 @@ open class WebSocket: WebSocketConnection {
             // SEE `ping()` FOR PONG RECEIVE LOGIC.
             break
         @unknown default:
-            fatalError()
+            break
         }
     }
 

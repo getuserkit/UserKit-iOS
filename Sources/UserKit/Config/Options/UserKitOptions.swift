@@ -18,7 +18,7 @@ public final class UserKitOptions: NSObject, Encodable {
     @objc(UKLogging)
     @objcMembers
     public final class Logging: NSObject, Encodable {
-        /// Defines the minimum log level to print to the console. Defaults to `warn`.
+        /// Defines the minimum log level to print to the console. Defaults to `info`.
         public var level: LogLevel = .info
 
         /// Defines the scope of logs to print to the console. Defaults to .all.

@@ -178,7 +178,12 @@ class CallManager {
             self.sessionId = response.sessionId
                         
         } catch {
-            assertionFailure("Failed to join call: \(error)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to join call",
+                error: error
+            )
         }
                 
         await pushTracks()
@@ -210,7 +215,12 @@ class CallManager {
     
     @MainActor private func presentAlert(title: String, message: String, options: [UIAlertAction]) {
         guard let viewController = UIViewController.topViewController else {
-            fatalError("Failed to find top view controller")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to find top view controller"
+            )
+            return
         }
         
         alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
@@ -260,7 +270,12 @@ class CallManager {
             self.sessionId = response.sessionId
                         
         } catch {
-            assertionFailure("Failed to join call: \(error)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to join call",
+                error: error
+            )
         }
                 
         // Pull and push tracks
@@ -336,14 +351,24 @@ class CallManager {
             }
             webSocketClient.send(string: json)
         } catch {
-            assertionFailure("Failed to leave call: \(error)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to end call",
+                error: error
+            )
         }
     }
     
     private func addPictureInPictureViewController() {
         Task { @MainActor in
             guard let viewController = UIViewController.topViewController else {
-                fatalError("Failed to find top view controller")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to find top view controller"
+                )
+                return
             }
             
             guard pictureInPictureViewController == nil else {
@@ -413,7 +438,12 @@ class CallManager {
     
     private func pullTracks() async {
         guard let sessionId = sessionId else {
-            return assertionFailure("Failed to pull tracks, session required")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to pull tracks, no session present"
+            )
+            return
         }
         
         guard case .some(let call) = state.read({ $0 }) else {
@@ -473,7 +503,12 @@ class CallManager {
                 as: APIClient.RenegotiateResponse.self
             )
         } catch {
-            assertionFailure("Failed to pull tracks: \(error)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to pull tracks",
+                error: error
+            )
         }
     }
     
@@ -486,10 +521,15 @@ class CallManager {
     
     private func pushTracks() async {
         guard let sessionId = sessionId else {
-            return assertionFailure("Failed to pull tracks, session required")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to push tracks, no session present"
+            )
+            return
         }
         
-        guard case .some(let call) = state.read({ $0 }) else {
+        guard case .some(_) = state.read({ $0 }) else {
             return
         }
 
@@ -522,7 +562,12 @@ class CallManager {
             
             try await updateParticipantTracks()
         } catch {
-            assertionFailure("Failed to push tracks: \(error)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to push tracks",
+                error: error
+            )
         }
     }
     
@@ -635,7 +680,12 @@ class CallManager {
     private func requestVideo() async {
         func updateParticipant(state: Call.Participant.Track.State) async {
             guard case .some(let call) = self.state.read({ $0 }) else {
-                return assertionFailure("Failed to handle state change, invalid call state")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, invalid call state"
+                )
+                return
             }
             
             guard let participant = call.participants.first(where: { $0.role == .user }) else {
@@ -666,7 +716,12 @@ class CallManager {
                 }
                 webSocketClient.send(string: json)
             } catch {
-                assertionFailure("Failed to handle state change, JSON invalid \(error)")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, JSON invalid",
+                    error: error
+                )
             }
         }
         
@@ -699,10 +754,15 @@ class CallManager {
         
         func updateParticipant(state: Call.Participant.Track.State) async {
             guard case .some(let call) = self.state.read({ $0 }) else {
-                return assertionFailure("Failed to handle state change, invalid call state")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, invalid call state"
+                )
+                return
             }
             
-            guard let participant = call.participants.first(where: { $0.role == .user }) else {
+            guard let _ = call.participants.first(where: { $0.role == .user }) else {
                 return
             }
             
@@ -734,7 +794,12 @@ class CallManager {
                 }
                 webSocketClient.send(string: json)
             } catch {
-                assertionFailure("Failed to handle state change, JSON invalid \(error)")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, JSON invalid",
+                    error: error
+                )
             }
         }
         
@@ -776,7 +841,12 @@ class CallManager {
                 await updateParticipant(state: .inactive)
     
             default:
-                assertionFailure("Failed to handle video request: \(error)")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle video request",
+                    error: error
+                )
             }
         }
     }
