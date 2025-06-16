@@ -63,7 +63,12 @@ final class PictureInPictureViewController: UIViewController {
 
 extension PictureInPictureViewController: AVPictureInPictureControllerDelegate {
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: any Error) {
-        assertionFailure("Failed to start picture in picture: \(error)")
+        Logger.debug(
+            logLevel: .error,
+            scope: .core,
+            message: "Failed to start picture in picture",
+            error: error
+        )
     }
      
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController) async -> Bool {

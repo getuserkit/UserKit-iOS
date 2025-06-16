@@ -49,6 +49,15 @@ actor WebRTCClient {
             case .answer:   self.type = .answer
             case .rollback: self.type = .rollback
             @unknown default:
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Unknown RTCSessionDescription type",
+                    info: [
+                        "type": rtcSessionDescription.type.rawValue
+                    ]
+                )
+
                 fatalError("Unknown RTCSessionDescription type: \(rtcSessionDescription.type.rawValue)")
             }
         }

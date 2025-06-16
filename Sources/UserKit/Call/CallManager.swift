@@ -232,7 +232,7 @@ class CallManager {
             audioSession.isAudioEnabled = true
             try audioSession.setActive(true)
         } catch {
-            print("Failed to configure audio session: \(error)")
+            Logger.debug(logLevel: .error, scope: .core, message: "Failed to configure audio session", error: error)
         }
         audioSession.unlockForConfiguration()
     }
@@ -314,9 +314,7 @@ class CallManager {
         webSocketClient.send(string: json)
     }
     
-    private func end() async {
-        let state = state.read({ $0 })
-        
+    private func end(uuid: String) async {
         await stopPictureInPicture()
         await cameraClient.stop()
         
@@ -329,21 +327,16 @@ class CallManager {
         
         await webRTCClient.close()
         
-        switch state {
-        case .some(let call):
-            do {
-                let message: [String: Any] = ["type": "call.participant.end", "data": ["uuid": call.uuid]]
-                let jsonData = try JSONSerialization.data(withJSONObject: message, options: .prettyPrinted)
-                guard let json = String(data: jsonData, encoding: .utf8) else {
-                    enum UserKitError: Error { case invalidJSON }
-                    throw UserKitError.invalidJSON
-                }
-                webSocketClient.send(string: json)
-            } catch {
-                assertionFailure("Failed to leave call: \(error)")
+        do {
+            let message: [String: Any] = ["type": "call.participant.end", "data": ["uuid": uuid]]
+            let jsonData = try JSONSerialization.data(withJSONObject: message, options: .prettyPrinted)
+            guard let json = String(data: jsonData, encoding: .utf8) else {
+                enum UserKitError: Error { case invalidJSON }
+                throw UserKitError.invalidJSON
             }
-        default:
-            break
+            webSocketClient.send(string: json)
+        } catch {
+            assertionFailure("Failed to leave call: \(error)")
         }
     }
     
@@ -571,7 +564,7 @@ class CallManager {
                         },
                         UIAlertAction(title: "End", style: .cancel) { [weak self] alertAction in
                             Task {
-                                await self?.end()
+                                await self?.end(uuid: call.uuid)
                             }
                         }
                     ])
@@ -631,9 +624,9 @@ class CallManager {
             if oldTracks != newTracks {
                 await pullTracks()
             }
-        case (.some(_), .none):
+        case (.some(let oldCall), .none):
             await alertController?.dismiss(animated: true)
-            await end()
+            await end(uuid: oldCall.uuid)
         case (.none, .none):
             break
         }
@@ -815,7 +808,7 @@ extension CallManager: PictureInPictureViewControllerDelegate {
                 },
                 UIAlertAction(title: "End", style: .cancel) { [weak self] alertAction in
                     Task {
-                        await self?.end()
+                        await self?.end(uuid: call.uuid)
                     }
                 }
             ])

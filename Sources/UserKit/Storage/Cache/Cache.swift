@@ -162,8 +162,10 @@ class Cache {
                 requiringSecureCoding: true
             )
         else {
-            print(
-                "Could not write object that doesn't conform to NSSecureCoding to cache."
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Could not write object that doesn't conform to NSSecureCoding to cache."
             )
             return
         }
@@ -196,8 +198,10 @@ class Cache {
                 requiringSecureCoding: true
             )
         else {
-            print(
-                "Could not write object that doesn't conform to NSSecureCoding to cache."
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Could not write object that doesn't conform to NSSecureCoding to cache."
             )
             return
         }
@@ -230,8 +234,10 @@ class Cache {
                         attributes: nil
                     )
                 } catch {
-                    print(
-                        "Error while creating cache folder: \(error.safeLocalizedDescription)"
+                    Logger.debug(
+                        logLevel: .error,
+                        scope: .core,
+                        message: "Error while creating cache folder: \(error.safeLocalizedDescription)"
                     )
                 }
             }
@@ -266,8 +272,10 @@ class Cache {
                     }
                 }
             } catch {
-                print(
-                    "Error while deleting file: \(error.safeLocalizedDescription)"
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Error while deleting file: \(error.safeLocalizedDescription)"
                 )
             }
         }
@@ -299,8 +307,11 @@ extension Cache {
                     try self.fileManager.removeItem(atPath: path)
                 }
             } catch {
-                print(
-                    "Error when clean disk: \(error.safeLocalizedDescription)")
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Error when clean disk: \(error.safeLocalizedDescription)"
+                )
             }
         }
     }
@@ -324,8 +335,10 @@ extension Cache {
                 do {
                     try self.fileManager.removeItem(at: fileURL)
                 } catch {
-                    print(
-                        "Error while removing files \(error.safeLocalizedDescription)"
+                    Logger.debug(
+                        logLevel: .error,
+                        scope: .core,
+                        message: "Error while removing files \(error.safeLocalizedDescription)"
                     )
                 }
             }
@@ -352,8 +365,10 @@ extension Cache {
                     do {
                         try self.fileManager.removeItem(at: fileURL)
                     } catch {
-                        print(
-                            "Error while removing files \(error.safeLocalizedDescription)"
+                        Logger.debug(
+                            logLevel: .error,
+                            scope: .core,
+                            message: "Error while removing files \(error.safeLocalizedDescription)"
                         )
                     }
 
@@ -429,8 +444,10 @@ extension Cache {
                     cachedFiles[fileUrl] = resourceValues
                 }
             } catch {
-                print(
-                    "Error while iterating files \(error.safeLocalizedDescription)"
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Error while iterating files \(error.safeLocalizedDescription)"
                 )
             }
         }

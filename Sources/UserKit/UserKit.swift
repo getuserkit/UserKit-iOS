@@ -13,7 +13,7 @@ let sdkVersion = """
 0.1.0
 """
 
-public class UserKit {
+public final class UserKit {
     
     // MARK: - Types
     
@@ -22,20 +22,44 @@ public class UserKit {
     }
     
     // MARK: - Properties
+                
+    public static var shared: UserKit {
+        guard let userKit = userKit else {
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "UserKit has not been configured. Please call UserKit.configure()"
+            )
+            assertionFailure("UserKit has not been configured. Please call UserKit.configure()")
+            return UserKit(apiKey: "")
+        }
+        
+        return userKit
+    }
     
     public var isLoggedIn: Bool {
         return userManager.isLoggedIn
     }
     
-    private static var userKit: UserKit?
-        
-    public static var shared: UserKit {
-        guard let userKit = userKit else {
-            fatalError("UserKit has not been configured. Please call UserKit.configure()")
+    /// Specifies the detail of the logs returned from the SDK to the console.
+    public var logLevel: LogLevel {
+        get {
+            return options.logging.level
         }
-        
-        return userKit
+        set {
+            options.logging.level = newValue
+        }
     }
+    
+    /// A convenience variable to access and change the options that you passed
+    var options: UserKitOptions {
+      return configManager.options
+    }
+    
+    private static var userKit: UserKit?
+
+    @DispatchQueueBacked
+    public private(set) static var isInitialized = false
     
     private let apiKey: String
     
@@ -44,6 +68,8 @@ public class UserKit {
     private let availabilityManager: AvailabilityManager
     
     private let callManager: CallManager
+    
+    private let configManager: ConfigManager
     
     private let device: Device
     
@@ -58,30 +84,36 @@ public class UserKit {
     // MARK: - Functions
     
     @discardableResult
-    public static func configure(apiKey: String) -> UserKit {
+    public static func configure(apiKey: String, options: UserKitOptions? = nil) -> UserKit {
         guard userKit == nil else {
             return shared
         }
                         
-        userKit = .init(apiKey: apiKey)
+        userKit = .init(apiKey: apiKey, options: options)
                         
         if let userKit = userKit, userKit.isLoggedIn {
             Task {
-                do {
-                    try await userKit.userManager.connect()
-                } catch {
-                    print("Failed to connect to UserKit: \(error)")
-                }
+                try await userKit.userManager.connect()
             }
         }
+        
+        Logger.debug(
+          logLevel: .debug,
+          scope: .core,
+          message: "SDK Version - \(sdkVersion)"
+        )
+        
+        isInitialized = true
         
         return shared
     }
         
-    init(apiKey: String) {
+    init(apiKey: String, options: UserKitOptions? = nil) {
         self.apiKey = apiKey
         self.device = Device()
         self.apiClient = APIClient(device: device)
+        let options = options ?? UserKitOptions()
+        self.configManager = ConfigManager(options: options)
         self.storage = Storage()
         self.availabilityManager = AvailabilityManager(apiClient: apiClient, storage: storage)
         self.webRTCClient = WebRTCClient()

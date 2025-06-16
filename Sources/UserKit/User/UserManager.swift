@@ -74,33 +74,67 @@ class UserManager {
         
         let credentials = Credentials(apiKey: apiKey, id: id, name: name, email: email)
         storage.save(credentials, forType: AppUserCredentials.self)
+        
+        Logger.debug(
+            logLevel: .info,
+            scope: .core,
+            message: "Logged user in with credentials:",
+            info: [
+                "id": credentials.id ?? "",
+                "name": credentials.name ?? "",
+                "email": credentials.email ?? ""
+            ]
+        )
 
         try await connect()
     }
     
     func connect() async throws {
         guard let credentials = storage.get(AppUserCredentials.self) else {
-            assertionFailure("Connect called with no credentials found")
+            Logger.debug(
+                logLevel: .warn,
+                scope: .core,
+                message: "Attempted to connect to UserKit without valid credentials."
+            )
             return
         }
-                
-        let response = try await apiClient.request(
-            apiKey: credentials.apiKey,
-            endpoint: .postUser(
-                .init(
-                    id: credentials.id,
-                    name: credentials.name,
-                    email: credentials.email,
-                    appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        
+        do {
+            let response = try await apiClient.request(
+                apiKey: credentials.apiKey,
+                endpoint: .postUser(
+                    .init(
+                        id: credentials.id,
+                        name: credentials.name,
+                        email: credentials.email,
+                        appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+                    )
+                ),
+                as: APIClient.UserResponse.self
+            )
+
+            await apiClient.setAccessToken(response.accessToken)
+
+            webSocket.delegate = self
+            webSocket.connect(url: response.webSocketUrl, accessToken: response.accessToken)
+        } catch {
+            switch error {
+            case NetworkError.notAuthenticated:
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to connect to UserKit, please check your API key is valid",
                 )
-            ),
-            as: APIClient.UserResponse.self
-        )
 
-        await apiClient.setAccessToken(response.accessToken)
-
-        webSocket.delegate = self
-        webSocket.connect(url: response.webSocketUrl, accessToken: response.accessToken)
+            default:
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to connect to UserKit",
+                    error: error
+                )
+            }
+        }
     }
     
     private func handle(message: String) async {
@@ -108,7 +142,14 @@ class UserManager {
             guard let data = message.data(using: .utf8),
                   let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let messageType = json["type"] as? String else {
-                assertionFailure("Invalid WebSocket message format")
+                Logger.debug(
+                    logLevel: .warn,
+                    scope: .core,
+                    message: "Unknown user message format",
+                    info: [
+                        "message": message
+                    ]
+                )
                 return
             }
             
@@ -121,11 +162,23 @@ class UserManager {
                 break
                 
             default:
-                print("Unknown message type: \(messageType)")
+                Logger.debug(
+                    logLevel: .warn,
+                    scope: .core,
+                    message: "Unknown user message type",
+                    info: [
+                        "message_type": messageType
+                    ]
+                )
             }
         } catch {
             self.state.mutate { $0 = .none }
-            assertionFailure("Failed to process WebSocket message: \(error)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to handle message",
+                error: error
+            )
         }
     }
     
@@ -139,7 +192,12 @@ class UserManager {
             }
         } catch {
             self.state.mutate { $0 = .none }
-            assertionFailure("Failed to update user state \(error) \(state)")
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to update user state",
+                error: error
+            )
         }
     }
 }
@@ -148,10 +206,22 @@ extension UserManager: WebSocketConnectionDelegate {
     func webSocketDidConnect(connection: any WebSocketConnection) {
         webSocket.ping(interval: 10)
         
+        Logger.debug(
+            logLevel: .info,
+            scope: .core,
+            message: "Connected to UserKit"
+        )
+        
         callManager.webSocketDidConnect()
     }
     
     func webSocketDidDisconnect(connection: any WebSocketConnection, closeCode: NWProtocolWebSocket.CloseCode, reason: Data?) {
+        Logger.debug(
+            logLevel: .info,
+            scope: .core,
+            message: "Disconnected from UserKit"
+        )
+        
         switch closeCode {
         case .protocolCode(.goingAway):
             Task {

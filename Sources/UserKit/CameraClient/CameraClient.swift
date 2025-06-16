@@ -103,7 +103,7 @@ actor CameraClient {
         }
         
         guard let (device, input) = deviceInfo else {
-            print("Camera device or input unavailable")
+            Logger.debug(logLevel: .info, scope: .core, message: "Camera device or input unavailable")
             return
         }
         
@@ -130,8 +130,6 @@ actor CameraClient {
                     session.addOutput(dataOutput)
                 }
                 
-                // Important: Start the capture session on background thread
-                print("Starting camera capture session on background thread")
                 if !session.isRunning {
                     session.startRunning()
                 }

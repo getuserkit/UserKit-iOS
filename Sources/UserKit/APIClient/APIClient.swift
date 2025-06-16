@@ -10,6 +10,16 @@ import Foundation
 //let baseURL = "http://localhost:3000"
 let baseURL = "https://getuserkit.com"
 
+enum NetworkError: LocalizedError {
+    case notAuthenticated
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated: return NSLocalizedString("Unauthorized.", comment: "")
+        }
+    }
+}
+
 actor APIClient {
     
     // MARK: - Properties
@@ -52,6 +62,7 @@ actor APIClient {
             throw APIError.invalidURL
         }
         
+        let startTime = Date().timeIntervalSince1970
         var request = URLRequest(url: url)
         
         let headers = [
@@ -94,20 +105,41 @@ actor APIClient {
         if let body = route.body {
             let json = try encoder.encode(body)
             request.httpBody = json
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
             
-//            print("Raw JSON Request: \(String(data: json, encoding: .utf8) ?? "unable to decode")")
+            if let response = response as? HTTPURLResponse {
+                if response.statusCode == 401 {
+                    throw NetworkError.notAuthenticated
+                }
+            }
+            
+            let requestDuration = Date().timeIntervalSince1970 - startTime
+            Logger.debug(
+                logLevel: .debug,
+                scope: .network,
+                message: "Request Completed",
+                info: [
+                    "request": request.debugDescription,
+                    "api_key": accessToken ?? "unknown",
+                    "url": request.url?.absoluteString ?? "unknown",
+                    "request_duration": requestDuration
+                ]
+            )
+            
+            return data
+        } catch {
+            Logger.debug(
+                logLevel: .error,
+                scope: .network,
+                message: "Request Failed:",
+                error: error
+            )
+
+            throw error
         }
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        
-        // Print raw JSON response
-        if let jsonString = String(data: data, encoding: .utf8) {
-            print("Raw JSON Response: \(jsonString)")
-        } else {
-            print("Unable to convert response data to string")
-        }
-        
-        return data
     }
     
     // Model types and request structure from original code
