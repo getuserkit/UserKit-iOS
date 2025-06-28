@@ -63,13 +63,13 @@ class UserManager {
         }
     }
     
-    func login(apiKey: String, id: String?, name: String?, email: String?) async throws {
+    func identify(apiKey: String, id: String?, name: String?, email: String?) async throws {
         enum UserKitError: Error {
-            case loginCredentialRequired
+            case identityCredentialRequired
         }
         
         if (id?.isEmpty ?? true) && (name?.isEmpty ?? true) && (email?.isEmpty ?? true) {
-            throw UserKitError.loginCredentialRequired
+            throw UserKitError.identityCredentialRequired
         }
         
         let credentials = Credentials(apiKey: apiKey, id: id, name: name, email: email)
@@ -78,7 +78,7 @@ class UserManager {
         Logger.debug(
             logLevel: .info,
             scope: .core,
-            message: "Logged user in with credentials:",
+            message: "Identified user in with credentials:",
             info: [
                 "id": credentials.id ?? "",
                 "name": credentials.name ?? "",

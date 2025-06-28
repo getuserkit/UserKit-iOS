@@ -122,8 +122,8 @@ public final class UserKit {
         self.userManager = UserManager(apiClient: apiClient, callManager: callManager, storage: storage, webSocket: webSocket)
     }
     
-    public func login(id: String?, name: String?, email: String?) async throws {
-        try await userManager.login(apiKey: apiKey, id: id, name: name, email: email)
+    public func identify(id: String?, name: String?, email: String?) async throws {
+        try await userManager.identify(apiKey: apiKey, id: id, name: name, email: email)
     }
         
     public func availability() async throws -> Availability {

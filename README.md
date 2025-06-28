@@ -38,8 +38,8 @@ import UserKit
 // Initialize with your API key
 UserKit.configure(apiKey: "your_api_key")
 
-// Log the user in
-try await UserKit.shared.login(id: "2", name: "Tom Nicholls", email: "tom@nicholls.com")
+// Identify the user in
+try await UserKit.shared.identify(id: "2", name: "Tom Nicholls", email: "tom@nicholls.com")
 ```
 
 That's all that is required! 

@@ -238,7 +238,7 @@ class CallManager {
         audioSession.lockForConfiguration()
         do {
             try audioSession.setCategory(.playAndRecord, mode: .videoChat, options: [.defaultToSpeaker])
-            audioSession.useManualAudio = true
+            audioSession.useManualAudio = false
             audioSession.isAudioEnabled = true
             try audioSession.setActive(true)
         } catch {
