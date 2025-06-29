@@ -627,7 +627,21 @@ class CallManager {
             }
             
             let oldUser = oldCall.participants.first(where: { $0.role == .user }) ?? .init(state: .none, role: .user)
-                        
+
+            let oldAudioTrack = oldUser.tracks.first(where: { $0.type == .audio })
+            let newAudioTrack = newUser.tracks.first(where: { $0.type == .audio })
+                    
+            if let oldTrack = oldAudioTrack, let newTrack = newAudioTrack {
+                switch (oldTrack.state, newTrack.state) {
+                case (.inactive, .requested):
+                    await requestAudio()
+                case (.active, .inactive):
+                    await muteAudio()
+                default:
+                    break
+                }
+            }
+            
             let oldVideoTrack = oldUser.tracks.first(where: { $0.type == .video })
             let newVideoTrack = newUser.tracks.first(where: { $0.type == .video })
                     
@@ -677,6 +691,117 @@ class CallManager {
         }
     }
     
+    private func requestAudio() async {
+        func updateParticipant(state: Call.Participant.Track.State) async {
+            guard case .some(let call) = self.state.read({ $0 }) else {
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, invalid call state"
+                )
+                return
+            }
+            
+            guard let participant = call.participants.first(where: { $0.role == .user }) else {
+                return
+            }
+            
+            let data: [String: Any] = [
+                "transceiverSessionId": participant.transceiverSessionId ?? "",
+                "tracks": participant.tracks.map { track in
+                    [
+                        "id": track.id,
+                        "state": track.type == .audio ? state.rawValue : track.state.rawValue,
+                        "type": track.type.rawValue
+                    ]
+                }
+            ]
+            
+            let participantUpdate: [String: Any] = [
+                "type": "call.participant.tracks.update",
+                "data": data
+            ]
+            
+            do {
+                let jsonData = try JSONSerialization.data(withJSONObject: participantUpdate, options: .prettyPrinted)
+                guard let json = String(data: jsonData, encoding: .utf8) else {
+                    enum UserKitError: Error { case invalidJSON }
+                    throw UserKitError.invalidJSON
+                }
+                webSocketClient.send(string: json)
+            } catch {
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, JSON invalid",
+                    error: error
+                )
+            }
+        }
+        
+        let transceivers = await webRTCClient.getLocalTransceivers()
+        if let audioTransceiver = transceivers["audio"] {
+            audioTransceiver.sender.track?.isEnabled = true
+        }
+
+        await updateParticipant(state: .active)
+    }
+
+    private func muteAudio() async {
+        func updateParticipant(state: Call.Participant.Track.State) async {
+            guard case .some(let call) = self.state.read({ $0 }) else {
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, invalid call state"
+                )
+                return
+            }
+            
+            guard let participant = call.participants.first(where: { $0.role == .user }) else {
+                return
+            }
+            
+            let data: [String: Any] = [
+                "transceiverSessionId": participant.transceiverSessionId ?? "",
+                "tracks": participant.tracks.map { track in
+                    [
+                        "id": track.id,
+                        "state": track.type == .audio ? state.rawValue : track.state.rawValue,
+                        "type": track.type.rawValue
+                    ]
+                }
+            ]
+            
+            let participantUpdate: [String: Any] = [
+                "type": "call.participant.tracks.update",
+                "data": data
+            ]
+            
+            do {
+                let jsonData = try JSONSerialization.data(withJSONObject: participantUpdate, options: .prettyPrinted)
+                guard let json = String(data: jsonData, encoding: .utf8) else {
+                    enum UserKitError: Error { case invalidJSON }
+                    throw UserKitError.invalidJSON
+                }
+                webSocketClient.send(string: json)
+            } catch {
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to handle state change, JSON invalid",
+                    error: error
+                )
+            }
+        }
+        
+        let transceivers = await webRTCClient.getLocalTransceivers()
+        if let audioTransceiver = transceivers["audio"] {
+            audioTransceiver.sender.track?.isEnabled = false
+        }
+        
+        await updateParticipant(state: .inactive)
+    }
     private func requestVideo() async {
         func updateParticipant(state: Call.Participant.Track.State) async {
             guard case .some(let call) = self.state.read({ $0 }) else {
