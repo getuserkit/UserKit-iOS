@@ -802,6 +802,7 @@ class CallManager {
         
         await updateParticipant(state: .inactive)
     }
+    
     private func requestVideo() async {
         func updateParticipant(state: Call.Participant.Track.State) async {
             guard case .some(let call) = self.state.read({ $0 }) else {
@@ -856,15 +857,24 @@ class CallManager {
         }
         
         await updateParticipant(state: .active)
-        
-        let stream = await cameraClient.start()
+
+        await webRTCClient.replaceVideoTrack()
+
+        let stream = await self.cameraClient.start()
         for await buffer in stream {
-            await webRTCClient.handleVideoSourceBuffer(sampleBuffer: buffer.sampleBuffer)
+            await self.webRTCClient.handleVideoSourceBuffer(sampleBuffer: buffer.sampleBuffer)
         }
     }
     
     private func stopVideo() async {
         await cameraClient.stop()
+        
+        let transceivers = await webRTCClient.getLocalTransceivers()
+        if let transceiver = transceivers["video"] {
+            print("stopping track and replacing with nil")
+            transceiver.sender.track?.isEnabled = false
+            transceiver.sender.track = nil
+        }
     }
     
     private func requestScreenShare() async {

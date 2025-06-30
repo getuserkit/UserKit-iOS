@@ -121,17 +121,18 @@ actor WebRTCClient {
         let transceiverInit = RTCRtpTransceiverInit()
         transceiverInit.direction = .sendOnly
         
-        localTransceiversMap["audio"] = self.peerConnection?.addTransceiver(with: audioTrack, init: transceiverInit)
+        let transceiver = self.peerConnection?.addTransceiver(with: audioTrack, init: transceiverInit)
+        localTransceiversMap["audio"] = transceiver
     }
     
     private func addVideoTrack() {
         self.videoSource = WebRTCClient.factory.videoSource()
-        let videoTrack = WebRTCClient.factory.videoTrack(with: videoSource!, trackId: UUID().uuidString)
         self.videoCapturer = RTCVideoCapturer(delegate: videoSource!)
         
         let transceiverInit = RTCRtpTransceiverInit()
         transceiverInit.direction = .sendOnly
-        
+
+        let videoTrack = WebRTCClient.factory.videoTrack(with: videoSource!, trackId: UUID().uuidString)
         guard let transceiver = self.peerConnection?.addTransceiver(with: videoTrack, init: transceiverInit) else {
             return
         }
@@ -148,6 +149,15 @@ actor WebRTCClient {
             parameters.encodings = [encoding]
             transceiver.sender.parameters = parameters
         }
+    }
+    
+    func replaceVideoTrack() {
+        guard let transceiver = localTransceiversMap["video"] else {
+            return
+        }
+        
+        let videoTrack = WebRTCClient.factory.videoTrack(with: videoSource!, trackId: UUID().uuidString)
+        transceiver.sender.track = videoTrack
     }
     
     private func addScreenShareTrack() {
