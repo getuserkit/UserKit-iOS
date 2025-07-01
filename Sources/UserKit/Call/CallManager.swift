@@ -241,11 +241,13 @@ class CallManager {
             audioSession.useManualAudio = false
             audioSession.isAudioEnabled = true
             try audioSession.setActive(true)
+            try audioSession.overrideOutputAudioPort(.speaker)
         } catch {
             Logger.debug(logLevel: .error, scope: .core, message: "Failed to configure audio session", error: error)
         }
         audioSession.unlockForConfiguration()
     }
+
         
     private func join() async {
         do {
