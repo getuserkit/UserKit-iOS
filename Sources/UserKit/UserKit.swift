@@ -85,27 +85,28 @@ public final class UserKit: NSObject {
     // MARK: - Functions
     
     @discardableResult
-    public static func configure(apiKey: String, options: UserKitOptions? = nil) -> UserKit {
+    public static func configure(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)? = nil) -> UserKit {
         guard userKit == nil else {
+            Logger.debug(
+                logLevel: .warn,
+                scope: .core,
+                message:
+                    "UserKit.configure called multiple times. Please make sure you only call this once on app launch."
+            )
+            completion?()
             return shared
         }
-                        
-        userKit = .init(apiKey: apiKey, options: options)
-                        
-        if let userKit = userKit, userKit.isLoggedIn {
-            Task {
-                try await userKit.userManager.connect()
-            }
-        }
         
+        userKit = UserKit(apiKey: apiKey, options: options, completion: completion)
+
         Logger.debug(
-          logLevel: .debug,
-          scope: .core,
-          message: "SDK Version - \(sdkVersion)"
+            logLevel: .debug,
+            scope: .core,
+            message: "SDK Version - \(sdkVersion)"
         )
-        
+
         isInitialized = true
-        
+
         return shared
     }
         
@@ -121,6 +122,35 @@ public final class UserKit: NSObject {
         self.webSocket = WebSocket()
         self.callManager = CallManager(apiClient: apiClient, webRTCClient: webRTCClient, webSocketClient: webSocket)
         self.userManager = UserManager(apiClient: apiClient, callManager: callManager, storage: storage, webSocket: webSocket)
+    }
+    
+    private convenience init(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)?) {
+        self.init(apiKey: apiKey, options: options)
+        completion?()
+    }
+    
+    @discardableResult
+    @available(swift, obsoleted: 1.0)
+    public static func configure(apiKey: String) -> UserKit {
+        return objcConfigure(apiKey: apiKey)
+    }
+
+    private static func objcConfigure(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)? = nil) -> UserKit {
+        guard userKit == nil else {
+            Logger.debug(
+                logLevel: .warn,
+                scope: .core,
+                message:
+                    "UserKit.configure called multiple times. Please make sure you only call this once on app launch."
+            )
+            completion?()
+            return shared
+        }
+
+        let options = options ?? UserKitOptions()
+        userKit = UserKit(apiKey: apiKey, options: options, completion: completion)
+        
+        return shared
     }
     
     public func identify(id: String?, name: String?, email: String?) async throws {
