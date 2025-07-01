@@ -23,7 +23,8 @@ public final class UserKit: NSObject {
     }
     
     // MARK: - Properties
-                
+    
+    @objc(sharedInstance)
     public static var shared: UserKit {
         guard let userKit = userKit else {
             Logger.debug(
