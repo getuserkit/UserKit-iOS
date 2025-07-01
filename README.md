@@ -39,7 +39,7 @@ import UserKit
 UserKit.configure(apiKey: "your_api_key")
 
 // Identify the user in
-try await UserKit.shared.identify(id: "2", name: "Tom Nicholls", email: "tom@nicholls.com")
+UserKit.shared.identify(id: "2", name: "Tom Nicholls", email: "tom@nicholls.com")
 ```
 
 That's all that is required! 

@@ -63,13 +63,23 @@ class UserManager {
         }
     }
     
-    func identify(apiKey: String, id: String?, name: String?, email: String?) async throws {
+    func identify(apiKey: String, id: String?, name: String?, email: String?) async {
         enum UserKitError: Error {
             case identityCredentialRequired
         }
         
         if (id?.isEmpty ?? true) && (name?.isEmpty ?? true) && (email?.isEmpty ?? true) {
-            throw UserKitError.identityCredentialRequired
+            Logger.debug(
+                logLevel: .info,
+                scope: .core,
+                message: "Attempted to identify user without any credentials provided",
+                info: [
+                    "id": id as Any,
+                    "name": name as Any,
+                    "email": email as Any
+                ]
+            )
+            return
         }
         
         let credentials = Credentials(apiKey: apiKey, id: id, name: name, email: email)
@@ -86,7 +96,7 @@ class UserManager {
             ]
         )
 
-        try await connect()
+        try? await connect()
     }
     
     func connect() async throws {

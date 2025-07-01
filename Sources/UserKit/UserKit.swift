@@ -154,10 +154,12 @@ public final class UserKit: NSObject {
         return shared
     }
     
-    public func identify(id: String?, name: String?, email: String?) async throws {
-        try await userManager.identify(apiKey: apiKey, id: id, name: name, email: email)
+    @objc public func identify(id: String?, name: String?, email: String?) {
+        Task {
+            await userManager.identify(apiKey: apiKey, id: id, name: name, email: email)
+        }
     }
-        
+    
     public func availability() async throws -> Availability {
         try await availabilityManager.availability()
     }
