@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Network
+import PushKit
 
 struct Credentials: Codable {
     let apiKey: String
@@ -42,16 +43,21 @@ class UserManager {
     
     private let webSocket: WebSocket
     
+    private let pushKitManager: PushKitManager
+    
     private let state: StateSync<State>
     
     // MARK: - Functions
     
-    init(apiClient: APIClient, callManager: CallManager, storage: Storage, webSocket: WebSocket) {
+    init(apiClient: APIClient, callManager: CallManager, pushKitManager: PushKitManager, storage: Storage, webSocket: WebSocket) {
         self.apiClient = apiClient
         self.callManager = callManager
+        self.pushKitManager = pushKitManager
         self.storage = storage
         self.webSocket = webSocket
         self.state = .init(.none)
+        
+        pushKitManager.delegate = self
         
         state.onDidMutate = { [weak self] newState, oldState in
             switch newState {
@@ -255,4 +261,41 @@ extension UserManager: WebSocketConnectionDelegate {
     }
     
     func webSocketDidReceiveMessage(connection: any WebSocketConnection, data: Data) {}
+}
+
+// MARK: - PushKitManagerDelegate
+
+extension UserManager: PushKitManagerDelegate {
+    func pushKitManager(_ manager: PushKitManager, didReceiveIncomingPush payload: PKPushPayload) {
+        Logger.debug(
+            logLevel: .info,
+            scope: .core,
+            message: "Handling incoming VoIP push",
+            info: [
+                "payload": payload.dictionaryPayload
+            ]
+        )
+        
+        // TODO: Process push payload and initiate call
+    }
+    
+    func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data) {
+        Logger.debug(
+            logLevel: .info,
+            scope: .core,
+            message: "Push token updated, registering with server"
+        )
+        
+        // TODO: Send token to server via APIClient
+    }
+    
+    func pushKitManager(_ manager: PushKitManager, didInvalidatePushToken token: Data) {
+        Logger.debug(
+            logLevel: .info,
+            scope: .core,
+            message: "Push token invalidated"
+        )
+        
+        // TODO: Notify server that token is no longer valid
+    }
 }

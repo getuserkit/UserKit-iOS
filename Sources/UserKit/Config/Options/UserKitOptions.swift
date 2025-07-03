@@ -36,6 +36,26 @@ public final class UserKitOptions: NSObject, Encodable {
         }
     }
   
+    /// Configuration for VoIP push notifications.
+    @objc(UKPushKit)
+    @objcMembers
+    public final class PushKit: NSObject, Encodable {
+        /// Enable VoIP push notifications. Defaults to `true`.
+        public var enabled: Bool = true
+        
+        private enum CodingKeys: String, CodingKey {
+            case enabled
+        }
+        
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(enabled, forKey: .enabled)
+        }
+    }
+  
     /// The log scope and level to print to the console.
     public var logging = Logging()
+    
+    /// VoIP push notification configuration.
+    public var pushKit = PushKit()
 }

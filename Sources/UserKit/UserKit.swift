@@ -43,7 +43,6 @@ public final class UserKit: NSObject {
         return userManager.isLoggedIn
     }
     
-    /// Specifies the detail of the logs returned from the SDK to the console.
     public var logLevel: LogLevel {
         get {
             return options.logging.level
@@ -53,7 +52,6 @@ public final class UserKit: NSObject {
         }
     }
     
-    /// A convenience variable to access and change the options that you passed
     var options: UserKitOptions {
       return configManager.options
     }
@@ -82,6 +80,8 @@ public final class UserKit: NSObject {
     private let webRTCClient: WebRTCClient
     
     private let webSocket: WebSocket
+    
+    private let pushKitManager: PushKitManager
         
     // MARK: - Functions
     
@@ -114,15 +114,21 @@ public final class UserKit: NSObject {
     init(apiKey: String, options: UserKitOptions? = nil) {
         self.apiKey = apiKey
         self.device = Device()
-        self.apiClient = APIClient(device: device)
         let options = options ?? UserKitOptions()
+        self.apiClient = APIClient(device: device)
         self.configManager = ConfigManager(options: options)
         self.storage = Storage()
-        self.availabilityManager = AvailabilityManager(apiClient: apiClient, storage: storage)
         self.webRTCClient = WebRTCClient()
         self.webSocket = WebSocket()
+        self.pushKitManager = PushKitManager()
+        self.availabilityManager = AvailabilityManager(apiClient: apiClient, storage: storage)
         self.callManager = CallManager(apiClient: apiClient, webRTCClient: webRTCClient, webSocketClient: webSocket)
-        self.userManager = UserManager(apiClient: apiClient, callManager: callManager, storage: storage, webSocket: webSocket)
+        self.userManager = UserManager(apiClient: apiClient, callManager: callManager, pushKitManager: pushKitManager, storage: storage, webSocket: webSocket)
+        
+        // Configure PushKit if enabled
+        if options.pushKit.enabled {
+            pushKitManager.register()
+        }
     }
     
     private convenience init(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)?) {
@@ -135,7 +141,23 @@ public final class UserKit: NSObject {
     public static func configure(apiKey: String) -> UserKit {
         return objcConfigure(apiKey: apiKey)
     }
-
+    
+    public func identify(id: String?, name: String?, email: String?) {
+        Task {
+            await userManager.identify(apiKey: apiKey, id: id, name: name, email: email)
+        }
+    }
+    
+    public func availability() async throws -> Availability {
+        try await availabilityManager.availability()
+    }
+    
+    public func call() {
+        Task {
+            await callManager.call()
+        }
+    }
+    
     private static func objcConfigure(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)? = nil) -> UserKit {
         guard userKit == nil else {
             Logger.debug(
@@ -152,22 +174,6 @@ public final class UserKit: NSObject {
         userKit = UserKit(apiKey: apiKey, options: options, completion: completion)
         
         return shared
-    }
-    
-    @objc public func identify(id: String?, name: String?, email: String?) {
-        Task {
-            await userManager.identify(apiKey: apiKey, id: id, name: name, email: email)
-        }
-    }
-    
-    public func availability() async throws -> Availability {
-        try await availabilityManager.availability()
-    }
-    
-    public func call() {
-        Task {
-            await callManager.call()
-        }
     }
 }
 
