@@ -82,6 +82,8 @@ public final class UserKit: NSObject {
     private let webSocket: WebSocket
     
     private let pushKitManager: PushKitManager
+    
+    private let callKitManager: CallKitManager
         
     // MARK: - Functions
     
@@ -121,9 +123,10 @@ public final class UserKit: NSObject {
         self.webRTCClient = WebRTCClient()
         self.webSocket = WebSocket()
         self.pushKitManager = PushKitManager()
+        self.callKitManager = CallKitManager()
         self.availabilityManager = AvailabilityManager(apiClient: apiClient, storage: storage)
         self.callManager = CallManager(apiClient: apiClient, webRTCClient: webRTCClient, webSocketClient: webSocket)
-        self.userManager = UserManager(apiClient: apiClient, callManager: callManager, pushKitManager: pushKitManager, storage: storage, webSocket: webSocket)
+        self.userManager = UserManager(apiClient: apiClient, callKitManager: callKitManager, callManager: callManager, pushKitManager: pushKitManager, storage: storage, webSocket: webSocket)
     }
     
     private convenience init(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)?) {
@@ -147,11 +150,6 @@ public final class UserKit: NSObject {
         try await availabilityManager.availability()
     }
     
-    public func call() {
-        Task {
-            await callManager.call()
-        }
-    }
     
     private static func objcConfigure(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)? = nil) -> UserKit {
         guard userKit == nil else {

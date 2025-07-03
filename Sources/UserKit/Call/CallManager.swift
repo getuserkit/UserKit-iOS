@@ -146,48 +146,6 @@ class CallManager {
         }
     }
     
-    func call() async {
-        addPictureInPictureViewController()
-        
-        // Time for the view to be ready
-        try! await Task.sleep(nanoseconds: 50_000_000)
-        
-        do {
-            // Init the call
-            let message: [String: Any] = ["type": "call.participant.initiate"]
-            try post(message: message)
-            
-            // Create a session
-            async let apiTask = apiClient.request(
-                endpoint: .postSession(.init()),
-                as: APIClient.PostSessionResponse.self
-            )
-        
-            // Configure audio
-            configureAudioSession()
-            
-            // Configure WebRTC
-            async let webRTCTask = webRTCClient.configure()
-        
-            // Start Picture in Picture with loading state
-            async let pictureInPictureTask: () = startPictureInPicture()
-            
-            let (response, _, _) = try await (apiTask, webRTCTask, pictureInPictureTask)
-            
-            // Set session
-            self.sessionId = response.sessionId
-                        
-        } catch {
-            Logger.debug(
-                logLevel: .error,
-                scope: .core,
-                message: "Failed to join call",
-                error: error
-            )
-        }
-                
-        await pushTracks()
-    }
     
     func update(state: Call?) {
         self.state.mutate {

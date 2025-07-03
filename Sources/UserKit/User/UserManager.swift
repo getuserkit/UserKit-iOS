@@ -8,6 +8,7 @@
 import SwiftUI
 import Network
 import PushKit
+import CallKit
 
 struct Credentials: Codable {
     let apiKey: String
@@ -37,6 +38,8 @@ class UserManager {
     
     private let apiClient: APIClient
 
+    private let callKitManager: CallKitManager
+
     private let callManager: CallManager
     
     private let storage: Storage
@@ -49,8 +52,9 @@ class UserManager {
     
     // MARK: - Functions
     
-    init(apiClient: APIClient, callManager: CallManager, pushKitManager: PushKitManager, storage: Storage, webSocket: WebSocket) {
+    init(apiClient: APIClient, callKitManager: CallKitManager, callManager: CallManager, pushKitManager: PushKitManager, storage: Storage, webSocket: WebSocket) {
         self.apiClient = apiClient
+        self.callKitManager = callKitManager
         self.callManager = callManager
         self.pushKitManager = pushKitManager
         self.storage = storage
@@ -58,6 +62,7 @@ class UserManager {
         self.state = .init(.none)
         
         pushKitManager.delegate = self
+        callKitManager.delegate = self
         
         state.onDidMutate = { [weak self] newState, oldState in
             switch newState {
@@ -279,7 +284,13 @@ extension UserManager: PushKitManagerDelegate {
             ]
         )
         
-        // TODO: Process push payload and initiate call
+        // Extract call information from payload
+        let callUUID = UUID()
+        let callerName = payload.dictionaryPayload["callerName"] as? String ?? "Unknown Caller"
+        let hasVideo = payload.dictionaryPayload["hasVideo"] as? Bool ?? true
+        
+        // Report incoming call to CallKit
+        callKitManager.reportIncomingCall(uuid: callUUID, handle: callerName, hasVideo: hasVideo)
     }
     
     func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data) {
@@ -338,5 +349,44 @@ extension UserManager: PushKitManagerDelegate {
         )
         
         // TODO: Notify server that token is no longer valid
+    }
+}
+
+// MARK: - CallKitManagerDelegate
+
+extension UserManager: CallKitManagerDelegate {
+    func callKitManager(_ manager: CallKitManager, didAnswerCall callUUID: UUID) {
+        Logger.debug(
+            logLevel: .info,
+            scope: .pushKit,
+            message: "User answered call via CallKit",
+            info: [
+                "callUUID": callUUID.uuidString
+            ]
+        )
+        
+//        Task {
+//            await callManager.join()
+//        }
+    }
+    
+    func callKitManager(_ manager: CallKitManager, didEndCall callUUID: UUID) {
+        Logger.debug(
+            logLevel: .info,
+            scope: .pushKit,
+            message: "User ended call via CallKit",
+            info: [
+                "callUUID": callUUID.uuidString
+            ]
+        )
+        
+        Logger.debug(
+            logLevel: .info,
+            scope: .pushKit,
+            message: "Call ended by user, terminating call flow",
+            info: [
+                "callUUID": callUUID.uuidString
+            ]
+        )
     }
 }

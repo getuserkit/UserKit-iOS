@@ -56,6 +56,26 @@ public final class UserKitOptions: NSObject, Encodable {
     /// The log scope and level to print to the console.
     public var logging = Logging()
     
+    /// Configuration for CallKit integration.
+    @objc(UKCallKit)
+    @objcMembers
+    public final class CallKit: NSObject, Encodable {
+        /// Enable CallKit integration for native call UI. Defaults to `true`.
+        public var enabled: Bool = true
+        
+        private enum CodingKeys: String, CodingKey {
+            case enabled
+        }
+        
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(enabled, forKey: .enabled)
+        }
+    }
+  
     /// VoIP push notification configuration.
     public var pushKit = PushKit()
+    
+    /// CallKit integration configuration.
+    public var callKit = CallKit()
 }
