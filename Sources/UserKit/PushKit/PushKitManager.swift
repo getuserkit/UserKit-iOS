@@ -42,7 +42,7 @@ class PushKitManager: NSObject {
         guard !isRegistered else {
             Logger.debug(
                 logLevel: .info,
-                scope: .core,
+                scope: .pushKit,
                 message: "PushKit already registered for VoIP pushes"
             )
             return
@@ -50,7 +50,7 @@ class PushKitManager: NSObject {
         
         Logger.debug(
             logLevel: .info,
-            scope: .core,
+            scope: .pushKit,
             message: "Registering for VoIP push notifications"
         )
         
@@ -62,7 +62,7 @@ class PushKitManager: NSObject {
         guard isRegistered else {
             Logger.debug(
                 logLevel: .info,
-                scope: .core,
+                scope: .pushKit,
                 message: "PushKit not registered, skipping unregister"
             )
             return
@@ -70,7 +70,7 @@ class PushKitManager: NSObject {
         
         Logger.debug(
             logLevel: .info,
-            scope: .core,
+            scope: .pushKit,
             message: "Unregistering from VoIP push notifications"
         )
         
@@ -89,8 +89,11 @@ extension PushKitManager: PKPushRegistryDelegate {
         
         Logger.debug(
             logLevel: .info,
-            scope: .core,
-            message: "Received VoIP push token update"
+            scope: .pushKit,
+            message: "Received VoIP push token update",
+            info: [
+                "token": pushCredentials.token.map { String(format: "%02.2hhx", $0) }.joined()
+            ]
         )
         
         currentToken = pushCredentials.token
@@ -102,7 +105,7 @@ extension PushKitManager: PKPushRegistryDelegate {
         
         Logger.debug(
             logLevel: .info,
-            scope: .core,
+            scope: .pushKit,
             message: "Received incoming VoIP push",
             info: [
                 "payload": payload.dictionaryPayload
@@ -117,8 +120,11 @@ extension PushKitManager: PKPushRegistryDelegate {
         
         Logger.debug(
             logLevel: .info,
-            scope: .core,
-            message: "VoIP push token invalidated"
+            scope: .pushKit,
+            message: "VoIP push token invalidated",
+            info: [
+                "token": currentToken?.map { String(format: "%02.2hhx", $0) }.joined() ?? "unknown"
+            ]
         )
         
         if let token = currentToken {

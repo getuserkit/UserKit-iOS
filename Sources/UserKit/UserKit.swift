@@ -124,11 +124,6 @@ public final class UserKit: NSObject {
         self.availabilityManager = AvailabilityManager(apiClient: apiClient, storage: storage)
         self.callManager = CallManager(apiClient: apiClient, webRTCClient: webRTCClient, webSocketClient: webSocket)
         self.userManager = UserManager(apiClient: apiClient, callManager: callManager, pushKitManager: pushKitManager, storage: storage, webSocket: webSocket)
-        
-        // Configure PushKit if enabled
-        if options.pushKit.enabled {
-            pushKitManager.register()
-        }
     }
     
     private convenience init(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)?) {

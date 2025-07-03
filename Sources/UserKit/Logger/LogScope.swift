@@ -10,16 +10,18 @@ import Foundation
 /// The possible scope of logs to print to the console.
 @objc(UKLogScope)
 public enum LogScope: Int, Encodable, Sendable, CustomStringConvertible {
-    case all, core, network
+    case all, core, network, pushKit
 
     public var description: String {
         switch self {
         case .all:
-            return "all"
+            return "All"
         case .core:
-            return "core"
+            return "Core"
         case .network:
-            return "network"
+            return "Network"
+        case .pushKit:
+            return "PushKit"
         }
     }
 }

@@ -131,6 +131,9 @@ class UserManager {
 
             await apiClient.setAccessToken(response.accessToken)
 
+            // Register for VoIP pushes now that we're authenticated
+            pushKitManager.register()
+
             webSocket.delegate = self
             webSocket.connect(url: response.webSocketUrl, accessToken: response.accessToken)
         } catch {
@@ -269,7 +272,7 @@ extension UserManager: PushKitManagerDelegate {
     func pushKitManager(_ manager: PushKitManager, didReceiveIncomingPush payload: PKPushPayload) {
         Logger.debug(
             logLevel: .info,
-            scope: .core,
+            scope: .pushKit,
             message: "Handling incoming VoIP push",
             info: [
                 "payload": payload.dictionaryPayload
@@ -282,18 +285,56 @@ extension UserManager: PushKitManagerDelegate {
     func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data) {
         Logger.debug(
             logLevel: .info,
-            scope: .core,
-            message: "Push token updated, registering with server"
+            scope: .pushKit,
+            message: "Push token updated, registering with server",
+            info: [
+                "token": token.map { String(format: "%02.2hhx", $0) }.joined()
+            ]
         )
         
-        // TODO: Send token to server via APIClient
+        Task {
+            await registerPushToken(token)
+        }
+    }
+    
+    private func registerPushToken(_ token: Data) async {
+        let tokenString = token.map { String(format: "%02.2hhx", $0) }.joined()
+        
+        do {
+            try await apiClient.request(
+                endpoint: .postDevice(.init(voipToken: tokenString)),
+                as: APIClient.PostDeviceResponse.self
+            )
+            
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "Successfully registered push token with server",
+                info: [
+                    "token": tokenString
+                ]
+            )
+        } catch {
+            Logger.debug(
+                logLevel: .error,
+                scope: .pushKit,
+                message: "Failed to register push token",
+                info: [
+                    "token": tokenString
+                ],
+                error: error
+            )
+        }
     }
     
     func pushKitManager(_ manager: PushKitManager, didInvalidatePushToken token: Data) {
         Logger.debug(
             logLevel: .info,
-            scope: .core,
-            message: "Push token invalidated"
+            scope: .pushKit,
+            message: "Push token invalidated",
+            info: [
+                "token": token.map { String(format: "%02.2hhx", $0) }.joined()
+            ]
         )
         
         // TODO: Notify server that token is no longer valid
