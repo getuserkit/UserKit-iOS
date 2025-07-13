@@ -67,6 +67,7 @@ class UserManager {
         
         pushKitManager.delegate = self
         callKitManager.delegate = self
+        callManager.delegate = self
         
         state.onDidMutate = { [weak self] newState, oldState in
             switch newState {
@@ -291,9 +292,7 @@ extension UserManager: PushKitManagerDelegate {
             ]
         )
         
-        Task {
-            await callKitManager.reportIncomingCall(uuid: payload.call.uuid, url: payload.call.url, caller: payload.call.caller.name, hasVideo: true)
-        }
+        callKitManager.reportIncomingCall(uuid: payload.call.uuid, url: payload.call.url, caller: payload.call.caller.name, hasVideo: true)
     }
     
     func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data) {
@@ -370,11 +369,14 @@ extension UserManager: CallKitManagerDelegate {
         Task {
             do {
                 try await connect(call: call)
+                await callManager.join()
             }
         }
     }
     
     func callKitManager(_ manager: CallKitManager, didEndCall call: CallKitManager.Call) {
+        // Send an API request straight to the socket ending the call?
+        
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
@@ -384,15 +386,15 @@ extension UserManager: CallKitManagerDelegate {
                 "url": call.url
             ]
         )
-        
-        Logger.debug(
-            logLevel: .info,
-            scope: .pushKit,
-            message: "Call ended by user, terminating call flow",
-            info: [
-                "uuid": call.uuid,
-                "url": call.url
-            ]
-        )
+    }
+}
+
+// MARK: - CallManagerDelegate
+
+extension UserManager: CallManagerDelegate {
+    func callManager(_ manager: CallManager, didEndCall uuid: UUID) {
+        Task {
+            await callKitManager.endCall(uuid: uuid)
+        }
     }
 }

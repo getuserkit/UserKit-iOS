@@ -120,9 +120,7 @@ extension PushKitManager: PKPushRegistryDelegate {
             let decoder = JSONDecoder()
             let parsedPayload = try decoder.decode(Payload.self, from: data)
             
-            Task { @MainActor in
-                self.delegate?.pushKitManager(self, didReceiveIncomingPush: parsedPayload)
-            }
+            delegate?.pushKitManager(self, didReceiveIncomingPush: parsedPayload)
         } catch {
             Logger.debug(
                 logLevel: .error,

@@ -18,6 +18,10 @@ import ReplayKit
 import SwiftUI
 import WebRTC
 
+protocol CallManagerDelegate: AnyObject {
+    func callManager(_ manager: CallManager, didEndCall uuid: UUID)
+}
+
 struct Call: Codable, Equatable {
     struct Participant: Codable, Equatable {
         enum State: String, Codable {
@@ -101,6 +105,8 @@ class CallManager {
     }
     
     // MARK: - Properties
+    
+    weak var delegate: CallManagerDelegate?
         
     private let apiClient: APIClient
     
@@ -169,6 +175,8 @@ class CallManager {
     func join() async {
         guard let accessToken = accessToken else { return }
         
+        addPictureInPictureViewController()
+        
         do {
             // Create a session
             async let apiTask = apiClient.request(
@@ -190,6 +198,12 @@ class CallManager {
             
             // Set session
             self.sessionId = response.sessionId
+            
+            Logger.debug(
+                logLevel: .debug,
+                scope: .core,
+                message: "Joined call",
+            )
                         
         } catch {
             Logger.debug(
@@ -200,8 +214,6 @@ class CallManager {
             )
         }
                 
-        // Pull and push tracks
-        await pullTracks()
         await pushTracks()
     }
     
@@ -328,6 +340,8 @@ class CallManager {
                 error: error
             )
         }
+        
+        delegate?.callManager(self, didEndCall: UUID(uuidString: uuid)!)
     }
     
     private func addPictureInPictureViewController() {
@@ -476,6 +490,12 @@ class CallManager {
                 )),
                 as: APIClient.RenegotiateResponse.self
             )
+            
+            Logger.debug(
+                logLevel: .debug,
+                scope: .core,
+                message: "Pulled tracks",
+            )
         } catch {
             Logger.debug(
                 logLevel: .error,
@@ -550,54 +570,8 @@ class CallManager {
     
     private func handleStateChange(oldCall: Call?, newCall: Call?) async {
         switch (oldCall, newCall) {
-        case (.none, .some(let call)):
-            let user = call.participants.first(where: { $0.role == .user })
-
-            switch user?.state {
-            case nil, .some(.none):
-                addPictureInPictureViewController()
-
-                let name = call.participants.first(where: { $0.role == .host})?.firstName
-                let message = "\(name ?? "Someone") is inviting you to a call"
-                await presentAlert(title: "Incoming Call", message: message, options: [
-                    UIAlertAction(title: "Join", style: .default) { [weak self] alertAction in
-                        Task {
-                            try self?.post(message: ["type": "call.participant.accept", "data": ["uuid": call.uuid]])
-                            await self?.join()
-                        }
-                    },
-                    UIAlertAction(title: "Not Now", style: .cancel) { [weak self] alertAction in
-                        Task {
-                            try self?.post(message: ["type": "call.participant.decline", "data": ["uuid": call.uuid]])
-                        }
-                    }
-                ])
-            case .joined:
-                addPictureInPictureViewController()
-                
-                let name = call.participants.first(where: { $0.role == .host})?.firstName
-                let message = "You are in a call with \(name ?? "someone")"
-
-                await MainActor.run {
-                    presentAlert(title: "Continue Call", message: message, options: [
-                        UIAlertAction(title: "Continue", style: .default) { [weak self] alertAction in
-                            self?.startPictureInPicture()
-                            Task { await self?.join() }
-                        },
-                        UIAlertAction(title: "End", style: .cancel) { [weak self] alertAction in
-                            Task {
-                                await self?.end(uuid: call.uuid)
-                            }
-                        }
-                    ])
-                }
-            case .initialized:
-                // NOP
-                break
-            case .declined:
-                // NOP
-                break
-            }
+        case (.none, .some):
+            break
         case (.some(let oldCall), .some(let newCall)):
             guard let newUser = newCall.participants.first(where: { $0.role == .user }), newUser.state == .joined else {
                 return
