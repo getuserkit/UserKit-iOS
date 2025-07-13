@@ -174,37 +174,39 @@ class CallManager {
     @MainActor
     func join() async {
         guard let accessToken = accessToken else { return }
-        
+
         addPictureInPictureViewController()
         
+        let start = Date()
+
         do {
-            // Create a session
             async let apiTask = apiClient.request(
                 accessToken: accessToken,
                 endpoint: .postSession(.init()),
                 as: APIClient.PostSessionResponse.self
             )
-            
-            // Configure audio
+
             configureAudioSession()
-            
-            // Configure WebRTC
+
             async let webRTCTask = webRTCClient.configure()
 
-            // Start Picture in Picture with loading state
-            async let pictureInPictureTask: () = startPictureInPicture()
-            
-            let (response, _, _) = try await (apiTask, webRTCTask, pictureInPictureTask)
-            
-            // Set session
+            let (response, _) = try await (apiTask, webRTCTask)
             self.sessionId = response.sessionId
-            
+
+            let elapsed = Date().timeIntervalSince(start)
+            if elapsed < 1 {
+                let remaining = UInt64((1 - elapsed) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: remaining)
+            }
+
+            startPictureInPicture()
+
             Logger.debug(
                 logLevel: .debug,
                 scope: .core,
-                message: "Joined call",
+                message: "Joined call"
             )
-                        
+
         } catch {
             Logger.debug(
                 logLevel: .error,
@@ -213,10 +215,10 @@ class CallManager {
                 error: error
             )
         }
-                
+
         await pushTracks()
     }
-    
+
     func webSocketDidConnect() {
         switch state.read({ $0 }) {
         case .some(let call) where call.participants.first(where: { $0.role == .user && $0.state == .joined }) != nil:
@@ -399,7 +401,9 @@ class CallManager {
                 return
             }
 
-            pictureInPictureViewController.pictureInPictureController.startPictureInPicture()
+            DispatchQueue.main.async {
+                pictureInPictureViewController.pictureInPictureController.startPictureInPicture()
+            }
         }
     }
     
