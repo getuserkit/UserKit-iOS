@@ -193,14 +193,6 @@ class CallManager {
             let (response, _) = try await (apiTask, webRTCTask)
             self.sessionId = response.sessionId
 
-            let elapsed = Date().timeIntervalSince(start)
-            if elapsed < 1 {
-                let remaining = UInt64((1 - elapsed) * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: remaining)
-            }
-
-            startPictureInPicture()
-
             Logger.debug(
                 logLevel: .debug,
                 scope: .core,
@@ -215,8 +207,16 @@ class CallManager {
                 error: error
             )
         }
-
+        
         await pushTracks()
+        
+        let elapsed = Date().timeIntervalSince(start)
+        if elapsed < 1 {
+            let remaining = UInt64((1 - elapsed) * 1_500_000_000)
+            try? await Task.sleep(nanoseconds: remaining)
+        }
+
+        await startPictureInPicture()
     }
 
     func webSocketDidConnect() {
@@ -389,21 +389,38 @@ class CallManager {
         }
     }
         
-    private func startPictureInPicture() {
-        Task { @MainActor in
-            await Task.yield() // yield to the run loop
-
-            guard let pictureInPictureViewController = pictureInPictureViewController else {
+//    private func startPictureInPicture() {
+//        Task { @MainActor in
+//            await Task.yield() // yield to the run loop
+//
+//            guard let pictureInPictureViewController = pictureInPictureViewController else {
+//                return
+//            }
+//            
+//            guard !pictureInPictureViewController.pictureInPictureController.isPictureInPictureActive else {
+//                return
+//            }
+//
+//            DispatchQueue.main.async {
+//                pictureInPictureViewController.pictureInPictureController.startPictureInPicture()
+//            }
+//        }
+//    }
+    
+    private func startPictureInPicture() async {
+        await MainActor.run { [weak self] in
+            guard let self = self,
+                  let pictureInPictureViewController = self.pictureInPictureViewController else {
                 return
             }
             
-            guard !pictureInPictureViewController.pictureInPictureController.isPictureInPictureActive else {
-                return
-            }
-
-            DispatchQueue.main.async {
-                pictureInPictureViewController.pictureInPictureController.startPictureInPicture()
-            }
+            pictureInPictureViewController.pictureInPictureController.startPictureInPicture()
+        }
+        
+        while !(await MainActor.run {
+            self.pictureInPictureViewController?.pictureInPictureController.isPictureInPictureActive ?? false
+        }) {
+            try? await Task.sleep(nanoseconds: 100_000_000)
         }
     }
     
@@ -908,7 +925,7 @@ class CallManager {
                 // Time for the view to be added to the hierarchy
                 try! await Task.sleep(nanoseconds: 500_000_000)
                 
-                self.startPictureInPicture()
+                await self.startPictureInPicture()
                 await self.setPictureInPictureTrack()
                 
                 await updateParticipant(state: .active)
@@ -963,8 +980,10 @@ extension CallManager: PictureInPictureViewControllerDelegate {
         await MainActor.run {
             presentAlert(title: "Continue Call", message: message, options: [
                 UIAlertAction(title: "Continue", style: .default) { [weak self] alertAction in
-                    self?.startPictureInPicture()
-                    Task { await self?.setPictureInPictureTrack() }
+                    Task {
+                        await self?.startPictureInPicture()
+                        await self?.setPictureInPictureTrack()
+                    }
                 },
                 UIAlertAction(title: "End", style: .cancel) { [weak self] alertAction in
                     Task {
