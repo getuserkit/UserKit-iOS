@@ -11,10 +11,10 @@ import PushKit
 import CallKit
 
 struct Credentials: Codable {
-    let apiKey: String
     let id: String?
     let name: String?
     let email: String?
+    let accessToken: String
 }
 
 class UserManager {
@@ -32,8 +32,12 @@ class UserManager {
     
     // MARK: - Properties
     
-    var isLoggedIn: Bool {
+    var isIdentified: Bool {
         storage.get(AppUserCredentials.self) != nil
+    }
+    
+    private var accessToken: String? {
+        storage.get(AppUserCredentials.self)?.accessToken
     }
     
     private let apiClient: APIClient
@@ -74,6 +78,12 @@ class UserManager {
         }
     }
     
+    func configure() {
+        if isIdentified {
+            pushKitManager.register()
+        }
+    }
+    
     func identify(apiKey: String, id: String?, name: String?, email: String?) async {
         enum UserKitError: Error {
             case identityCredentialRequired
@@ -92,55 +102,37 @@ class UserManager {
             )
             return
         }
-        
-        let credentials = Credentials(apiKey: apiKey, id: id, name: name, email: email)
-        storage.save(credentials, forType: AppUserCredentials.self)
-        
-        Logger.debug(
-            logLevel: .info,
-            scope: .core,
-            message: "Identified user in with credentials:",
-            info: [
-                "id": credentials.id ?? "",
-                "name": credentials.name ?? "",
-                "email": credentials.email ?? ""
-            ]
-        )
-
-        try? await connect()
-    }
-    
-    func connect() async throws {
-        guard let credentials = storage.get(AppUserCredentials.self) else {
-            Logger.debug(
-                logLevel: .warn,
-                scope: .core,
-                message: "Attempted to connect to UserKit without valid credentials."
-            )
-            return
-        }
-        
+                        
         do {
             let response = try await apiClient.request(
-                apiKey: credentials.apiKey,
+                apiKey: apiKey,
                 endpoint: .postUser(
                     .init(
-                        id: credentials.id,
-                        name: credentials.name,
-                        email: credentials.email,
+                        id: id,
+                        name: name,
+                        email: email,
                         appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
                     )
                 ),
                 as: APIClient.UserResponse.self
             )
+            
+            let credentials = Credentials(id: id, name: name, email: email, accessToken: response.accessToken)
+            storage.save(credentials, forType: AppUserCredentials.self)
 
-            await apiClient.setAccessToken(response.accessToken)
-
-            // Register for VoIP pushes now that we're authenticated
             pushKitManager.register()
-
-            webSocket.delegate = self
-            webSocket.connect(url: response.webSocketUrl, accessToken: response.accessToken)
+            
+            Logger.debug(
+                logLevel: .info,
+                scope: .core,
+                message: "Identified user in with credentials:",
+                info: [
+                    "id": credentials.id ?? "",
+                    "name": credentials.name ?? "",
+                    "email": credentials.email ?? "",
+                    "accessToken": credentials.accessToken
+                ]
+            )
         } catch {
             switch error {
             case NetworkError.notAuthenticated:
@@ -159,6 +151,21 @@ class UserManager {
                 )
             }
         }
+    }
+    
+    func connect(call: CallKitManager.Call) async throws {
+        guard let credentials = storage.get(AppUserCredentials.self) else {
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Attempted to connect to call whilst unidentified"
+            )
+            
+            return
+        }
+        
+        webSocket.delegate = self
+        webSocket.connect(url: call.url, accessToken: credentials.accessToken)
     }
     
     private func handle(message: String) async {
@@ -249,7 +256,7 @@ extension UserManager: WebSocketConnectionDelegate {
         switch closeCode {
         case .protocolCode(.goingAway):
             Task {
-                try await connect()
+// TODO                try await connect()
             }
         default:
             break
@@ -274,23 +281,19 @@ extension UserManager: WebSocketConnectionDelegate {
 // MARK: - PushKitManagerDelegate
 
 extension UserManager: PushKitManagerDelegate {
-    func pushKitManager(_ manager: PushKitManager, didReceiveIncomingPush payload: PKPushPayload) {
+    func pushKitManager(_ manager: PushKitManager, didReceiveIncomingPush payload: PushKitManager.Payload) {
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
             message: "Handling incoming VoIP push",
             info: [
-                "payload": payload.dictionaryPayload
+                "payload": payload
             ]
         )
         
-        // Extract call information from payload
-        let callUUID = UUID()
-        let callerName = payload.dictionaryPayload["callerName"] as? String ?? "Unknown Caller"
-        let hasVideo = payload.dictionaryPayload["hasVideo"] as? Bool ?? true
-        
-        // Report incoming call to CallKit
-        callKitManager.reportIncomingCall(uuid: callUUID, handle: callerName, hasVideo: hasVideo)
+        Task {
+            await callKitManager.reportIncomingCall(uuid: payload.call.uuid, url: payload.call.url, caller: payload.call.caller.name, hasVideo: true)
+        }
     }
     
     func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data) {
@@ -309,10 +312,13 @@ extension UserManager: PushKitManagerDelegate {
     }
     
     private func registerPushToken(_ token: Data) async {
+        guard let accessToken = accessToken else { return }
+        
         let tokenString = token.map { String(format: "%02.2hhx", $0) }.joined()
         
         do {
             try await apiClient.request(
+                accessToken: accessToken,
                 endpoint: .postDevice(.init(voipToken: tokenString)),
                 as: APIClient.PostDeviceResponse.self
             )
@@ -338,45 +344,44 @@ extension UserManager: PushKitManagerDelegate {
         }
     }
     
-    func pushKitManager(_ manager: PushKitManager, didInvalidatePushToken token: Data) {
+    func pushKitManagerDidInvalidatePushTokenFor(_ manager: PushKitManager) {
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
-            message: "Push token invalidated",
-            info: [
-                "token": token.map { String(format: "%02.2hhx", $0) }.joined()
-            ]
+            message: "Push token invalidated"
         )
-        
-        // TODO: Notify server that token is no longer valid
     }
 }
 
 // MARK: - CallKitManagerDelegate
 
 extension UserManager: CallKitManagerDelegate {
-    func callKitManager(_ manager: CallKitManager, didAnswerCall callUUID: UUID) {
+    func callKitManager(_ manager: CallKitManager, didAnswerCall call: CallKitManager.Call) {
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
             message: "User answered call via CallKit",
             info: [
-                "callUUID": callUUID.uuidString
+                "uuid": call.uuid,
+                "url": call.url
             ]
         )
         
-//        Task {
-//            await callManager.join()
-//        }
+        Task {
+            do {
+                try await connect(call: call)
+            }
+        }
     }
     
-    func callKitManager(_ manager: CallKitManager, didEndCall callUUID: UUID) {
+    func callKitManager(_ manager: CallKitManager, didEndCall call: CallKitManager.Call) {
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
             message: "User ended call via CallKit",
             info: [
-                "callUUID": callUUID.uuidString
+                "uuid": call.uuid,
+                "url": call.url
             ]
         )
         
@@ -385,7 +390,8 @@ extension UserManager: CallKitManagerDelegate {
             scope: .pushKit,
             message: "Call ended by user, terminating call flow",
             info: [
-                "callUUID": callUUID.uuidString
+                "uuid": call.uuid,
+                "url": call.url
             ]
         )
     }

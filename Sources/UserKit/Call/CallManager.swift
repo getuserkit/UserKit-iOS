@@ -108,7 +108,13 @@ class CallManager {
     
     private let webSocketClient: WebSocket
     
+    private let storage: Storage
+    
     private let state: StateSync<State>
+    
+    private var accessToken: String? {
+        storage.get(AppUserCredentials.self)?.accessToken
+    }
     
     private var sessionId: String? = nil
     
@@ -124,10 +130,11 @@ class CallManager {
             
     // MARK: - Functions
     
-    init(apiClient: APIClient, webRTCClient: WebRTCClient, webSocketClient: WebSocket) {
+    init(apiClient: APIClient, webRTCClient: WebRTCClient, webSocketClient: WebSocket, storage: Storage) {
         self.apiClient = apiClient
         self.webRTCClient = webRTCClient
         self.webSocketClient = webSocketClient
+        self.storage = storage
         self.state = .init(.none)
         
         state.onDidMutate = { [weak self] newState, oldState in
@@ -156,6 +163,46 @@ class CallManager {
                 $0 = .none
             }
         }
+    }
+    
+    @MainActor
+    func join() async {
+        guard let accessToken = accessToken else { return }
+        
+        do {
+            // Create a session
+            async let apiTask = apiClient.request(
+                accessToken: accessToken,
+                endpoint: .postSession(.init()),
+                as: APIClient.PostSessionResponse.self
+            )
+            
+            // Configure audio
+            configureAudioSession()
+            
+            // Configure WebRTC
+            async let webRTCTask = webRTCClient.configure()
+
+            // Start Picture in Picture with loading state
+            async let pictureInPictureTask: () = startPictureInPicture()
+            
+            let (response, _, _) = try await (apiTask, webRTCTask, pictureInPictureTask)
+            
+            // Set session
+            self.sessionId = response.sessionId
+                        
+        } catch {
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Failed to join call",
+                error: error
+            )
+        }
+                
+        // Pull and push tracks
+        await pullTracks()
+        await pushTracks()
     }
     
     func webSocketDidConnect() {
@@ -204,43 +251,6 @@ class CallManager {
             Logger.debug(logLevel: .error, scope: .core, message: "Failed to configure audio session", error: error)
         }
         audioSession.unlockForConfiguration()
-    }
-
-        
-    private func join() async {
-        do {
-            // Create a session
-            async let apiTask = apiClient.request(
-                endpoint: .postSession(.init()),
-                as: APIClient.PostSessionResponse.self
-            )
-            
-            // Configure audio
-            configureAudioSession()
-            
-            // Configure WebRTC
-            async let webRTCTask = webRTCClient.configure()
-
-            // Start Picture in Picture with loading state
-            async let pictureInPictureTask: () = startPictureInPicture()
-            
-            let (response, _, _) = try await (apiTask, webRTCTask, pictureInPictureTask)
-            
-            // Set session
-            self.sessionId = response.sessionId
-                        
-        } catch {
-            Logger.debug(
-                logLevel: .error,
-                scope: .core,
-                message: "Failed to join call",
-                error: error
-            )
-        }
-                
-        // Pull and push tracks
-        await pullTracks()
-        await pushTracks()
     }
     
     private func updateParticipantTracks() async throws {
@@ -397,6 +407,8 @@ class CallManager {
     }
     
     private func pullTracks() async {
+        guard let accessToken = accessToken else { return }
+        
         guard let sessionId = sessionId else {
             Logger.debug(
                 logLevel: .error,
@@ -441,6 +453,7 @@ class CallManager {
         
         do {
             let response = try await apiClient.request(
+                accessToken: accessToken,
                 endpoint: .pullTracks(sessionId, .init(tracks: tracks)),
                 as: APIClient.PullTracksResponse.self
             )
@@ -457,6 +470,7 @@ class CallManager {
             await setPictureInPictureTrack()
             
             try await apiClient.request(
+                accessToken: accessToken,
                 endpoint: .renegotiate(sessionId, .init(
                     sessionDescription: .init(sdp: localDescription.sdp, type: "answer")
                 )),
@@ -480,6 +494,8 @@ class CallManager {
     }
     
     private func pushTracks() async {
+        guard let accessToken = accessToken else { return }
+        
         guard let sessionId = sessionId else {
             Logger.debug(
                 logLevel: .error,
@@ -511,6 +527,7 @@ class CallManager {
             }
                         
             let response = try await apiClient.request(
+                accessToken: accessToken,
                 endpoint: .pushTracks(sessionId, .init(
                     sessionDescription: .init(sdp: localDescription.sdp, type: "offer"),
                     tracks: tracks

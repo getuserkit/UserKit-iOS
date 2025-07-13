@@ -10,11 +10,18 @@ import CallKit
 import UIKit
 
 protocol CallKitManagerDelegate: AnyObject {
-    func callKitManager(_ manager: CallKitManager, didAnswerCall callUUID: UUID)
-    func callKitManager(_ manager: CallKitManager, didEndCall callUUID: UUID)
+    func callKitManager(_ manager: CallKitManager, didAnswerCall call: CallKitManager.Call)
+    func callKitManager(_ manager: CallKitManager, didEndCall call: CallKitManager.Call)
 }
 
 class CallKitManager: NSObject {
+    
+    // MARK: - Type
+    
+    struct Call {
+        let uuid: UUID
+        let url: URL
+    }
     
     // MARK: - Properties
     
@@ -22,11 +29,16 @@ class CallKitManager: NSObject {
     
     private let provider: CXProvider
     private let callController: CXCallController
+    private var calls: [UUID: Call] = [:]
+    private let options: UserKitOptions
     
     // MARK: - Initialization
     
-    override init() {
+    init(options: UserKitOptions) {
+        self.options = options
+        
         let configuration = CXProviderConfiguration()
+        configuration.ringtoneSound = "UserKitRingtone.mp3"
         configuration.supportsVideo = true
         configuration.supportedHandleTypes = [.generic]
         configuration.maximumCallGroups = 1
@@ -34,70 +46,87 @@ class CallKitManager: NSObject {
         
         self.provider = CXProvider(configuration: configuration)
         self.callController = CXCallController()
+        
         super.init()
         
-        provider.setDelegate(self, queue: nil)
+        guard options.callKit.enabled else {
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "CallKit disabled, skipping set delegate"
+            )
+            return
+        }
+        
+        provider.setDelegate(self, queue: DispatchQueue.main)
     }
     
     // MARK: - Public Methods
     
-    func reportIncomingCall(uuid: UUID, handle: String, hasVideo: Bool = true) {
-        let update = CXCallUpdate()
-        update.remoteHandle = CXHandle(type: .generic, value: handle)
-        update.hasVideo = hasVideo
-        update.localizedCallerName = handle
+    @MainActor
+    func reportIncomingCall(uuid: UUID, url: URL, caller: String, hasVideo: Bool = true) async {
+        let call = Call(uuid: uuid, url: url)
+        calls[uuid] = call
         
-        provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
-            if let error = error {
-                Logger.debug(
-                    logLevel: .error,
-                    scope: .pushKit,
-                    message: "Failed to report incoming call",
-                    info: [
-                        "callUUID": uuid.uuidString,
-                        "handle": handle
-                    ],
-                    error: error
-                )
-            } else {
-                Logger.debug(
-                    logLevel: .info,
-                    scope: .pushKit,
-                    message: "Successfully reported incoming call",
-                    info: [
-                        "callUUID": uuid.uuidString,
-                        "handle": handle
-                    ]
-                )
-            }
+        let update = CXCallUpdate()
+        update.remoteHandle = CXHandle(type: .generic, value: caller)
+        update.hasVideo = hasVideo
+        update.localizedCallerName = caller
+        
+        do {
+            try await provider.reportNewIncomingCall(with: uuid, update: update)
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "Successfully reported incoming call",
+                info: [
+                    "uuid": uuid.uuidString,
+                    "caller": caller
+                ]
+            )
+        } catch {
+            calls.removeValue(forKey: uuid)
+            
+            Logger.debug(
+                logLevel: .error,
+                scope: .pushKit,
+                message: "Failed to report incoming call",
+                info: [
+                    "uuid": uuid.uuidString,
+                    "url": url,
+                    "caller": caller
+                ],
+                error: error
+            )
         }
     }
     
-    func endCall(uuid: UUID) {
+    @MainActor
+    func endCall(uuid: UUID) async {
         let endCallAction = CXEndCallAction(call: uuid)
         let transaction = CXTransaction(action: endCallAction)
+                
         
-        callController.request(transaction) { [weak self] error in
-            if let error = error {
-                Logger.debug(
-                    logLevel: .error,
-                    scope: .pushKit,
-                    message: "Failed to end call",
-                    info: [
-                        "callUUID": uuid.uuidString
-                    ],
-                    error: error
-                )
-            } else {
-                Logger.debug(
-                    logLevel: .info,
-                    scope: .pushKit,
-                    message: "Successfully ended call",
-                    info: [
-                        "callUUID": uuid.uuidString
-                    ]
-                )
-            }
+        do {
+            try await callController.request(transaction)
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "Successfully ended call",
+                info: [
+                    "uuid": uuid.uuidString
+                ]
+            )
+        } catch {
+            Logger.debug(
+                logLevel: .error,
+                scope: .pushKit,
+                message: "Failed to end call",
+                info: [
+                    "uuid": uuid.uuidString
+                ],
+                error: error
+            )
         }
     }
 }
@@ -107,54 +136,90 @@ class CallKitManager: NSObject {
 extension CallKitManager: CXProviderDelegate {
     
     func providerDidReset(_ provider: CXProvider) {
-        Logger.debug(
-            logLevel: .info,
-            scope: .pushKit,
-            message: "CallKit provider did reset"
-        )
+        Task { @MainActor in
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "CallKit provider did reset"
+            )
+        }
     }
     
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        Logger.debug(
-            logLevel: .info,
-            scope: .pushKit,
-            message: "User answered call",
-            info: [
-                "callUUID": action.callUUID.uuidString
-            ]
-        )
-        
-        delegate?.callKitManager(self, didAnswerCall: action.callUUID)
-        action.fulfill()
+        Task { @MainActor in
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "User answered call",
+                info: [
+                    "uuid": action.callUUID.uuidString
+                ]
+            )
+            
+            guard let call = calls[action.callUUID] else {
+                Logger.debug(
+                    logLevel: .info,
+                    scope: .pushKit,
+                    message: "Call data not found",
+                    info: [
+                        "uuid": action.callUUID.uuidString
+                    ]
+                )
+                action.fulfill()
+                return
+            }
+
+            delegate?.callKitManager(self, didAnswerCall: call)
+            action.fulfill()
+        }
     }
     
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
-        Logger.debug(
-            logLevel: .info,
-            scope: .pushKit,
-            message: "User ended call",
-            info: [
-                "callUUID": action.callUUID.uuidString
-            ]
-        )
-        
-        delegate?.callKitManager(self, didEndCall: action.callUUID)
-        action.fulfill()
+        Task { @MainActor in
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "User ended call",
+                info: [
+                    "uuid": action.callUUID.uuidString
+                ]
+            )
+            
+            guard let call = calls[action.callUUID] else {
+                Logger.debug(
+                    logLevel: .info,
+                    scope: .pushKit,
+                    message: "Call data not found",
+                    info: [
+                        "uuid": action.callUUID.uuidString
+                    ]
+                )
+                action.fulfill()
+                return
+            }
+            
+            delegate?.callKitManager(self, didEndCall: call)
+            action.fulfill()
+        }
     }
     
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        Logger.debug(
-            logLevel: .info,
-            scope: .pushKit,
-            message: "CallKit activated audio session"
-        )
+        Task { @MainActor in
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "CallKit activated audio session"
+            )
+        }
     }
     
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
-        Logger.debug(
-            logLevel: .info,
-            scope: .pushKit,
-            message: "CallKit deactivated audio session"
-        )
+        Task { @MainActor in
+            Logger.debug(
+                logLevel: .info,
+                scope: .pushKit,
+                message: "CallKit deactivated audio session"
+            )
+        }
     }
 }

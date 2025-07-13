@@ -26,7 +26,6 @@ actor APIClient {
     
     private let device: Device
     
-    private var accessToken: String?
     
     // MARK: - Functions
     
@@ -34,9 +33,6 @@ actor APIClient {
         self.device = device
     }
     
-    func setAccessToken(_ token: String) {
-        self.accessToken = token
-    }
     
     func request<T: Decodable>(apiKey: String, endpoint: Route, as type: T.Type) async throws -> T {
         let data = try await performRequest(apiKey, endpoint)
@@ -46,12 +42,8 @@ actor APIClient {
     }
     
     @discardableResult
-    func request<T: Decodable>(endpoint: Route, as type: T.Type) async throws -> T {
-        guard let token = accessToken else {
-            throw APIError.missingAPIKey
-        }
-        
-        let data = try await performRequest(token, endpoint)
+    func request<T: Decodable>(accessToken: String, endpoint: Route, as type: T.Type) async throws -> T {
+        let data = try await performRequest(accessToken, endpoint)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(T.self, from: data)
@@ -123,7 +115,7 @@ actor APIClient {
                 message: "Request Completed",
                 info: [
                     "request": request.debugDescription,
-                    "api_key": accessToken ?? "unknown",
+                    "api_key": token,
                     "url": request.url?.absoluteString ?? "unknown",
                     "request_duration": requestDuration
                 ]
@@ -148,8 +140,8 @@ actor APIClient {
             case get, post, put, delete
         }
         
-        case availability
         case postUser(UserRequest)
+        case postDevice(PostDeviceRequest)
         case postSession(PostSessionRequest)
         case pullTracks(String, PullTracksRequest)
         case pushTracks(String, PushTracksRequest)
@@ -157,14 +149,14 @@ actor APIClient {
                 
         var url: String {
             switch self {
-            case .availability:
-                "\(baseURL)/api/v1/availability"
-                
             case .postSession:
                 "\(baseURL)/api/v1/calls/sessions/new"
                 
             case .postUser:
                 "\(baseURL)/api/v1/users"
+                
+            case .postDevice:
+                "\(baseURL)/api/v1/devices"
                 
             case .pullTracks(let sessionId, _):
                 "\(baseURL)/api/v1/calls/sessions/\(sessionId)/tracks/new"
@@ -179,9 +171,7 @@ actor APIClient {
         
         var method: Method {
             switch self {
-            case .availability:
-                return .get
-            case .postSession, .postUser, .pullTracks, .pushTracks:
+            case .postSession, .postUser, .postDevice, .pullTracks, .pushTracks:
                 return .post
             case .renegotiate:
                 return .put
@@ -190,11 +180,11 @@ actor APIClient {
         
         var body: Encodable? {
             switch self {
-            case .availability:
-                return nil
             case .postSession:
                 return nil
             case .postUser(let request):
+                return request
+            case .postDevice(let request):
                 return request
             case .pullTracks(_, let request):
                 return request
@@ -212,6 +202,10 @@ actor APIClient {
                 encoder.keyEncodingStrategy = .convertToSnakeCase
             }
             
+            if case .postDevice = self {
+                encoder.keyEncodingStrategy = .convertToSnakeCase
+            }
+            
             return encoder
         }
     }
@@ -220,14 +214,15 @@ actor APIClient {
         case invalidURL
         case missingAPIKey
     }
-    
-    struct AvailabilityResponse: Codable, Equatable {
-        let available: Bool
-        let reason: String?
-    }
-    
+        
     // Request/Response Models
     struct PostSessionRequest: Codable, Equatable {}
+    
+    struct PostDeviceRequest: Codable, Equatable {
+        let voipToken: String
+    }
+    
+    struct PostDeviceResponse: Codable, Equatable {}
     
     struct SessionDescription: Codable, Equatable {
         let sdp: String
@@ -247,7 +242,6 @@ actor APIClient {
     
     struct UserResponse: Codable, Equatable {
         let accessToken: String
-        let webSocketUrl: URL
     }
     
     struct PullTracksRequest: Codable, Equatable {

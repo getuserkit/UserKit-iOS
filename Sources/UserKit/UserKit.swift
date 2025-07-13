@@ -9,18 +9,12 @@ import Foundation
 import UIKit
 import SwiftUI
 
-let sdkVersion = """
+internal let sdkVersion = """
 0.1.0
 """
 
 @objcMembers
 public final class UserKit: NSObject {
-    
-    // MARK: - Types
-    
-    public enum Availability {
-        case active, inactive
-    }
     
     // MARK: - Properties
     
@@ -39,8 +33,8 @@ public final class UserKit: NSObject {
         return userKit
     }
     
-    public var isLoggedIn: Bool {
-        return userManager.isLoggedIn
+    public var isIdentified: Bool {
+        return userManager.isIdentified
     }
     
     public var logLevel: LogLevel {
@@ -64,9 +58,7 @@ public final class UserKit: NSObject {
     private let apiKey: String
     
     private let apiClient: APIClient
-    
-    private let availabilityManager: AvailabilityManager
-    
+        
     private let callManager: CallManager
     
     private let configManager: ConfigManager
@@ -107,9 +99,11 @@ public final class UserKit: NSObject {
             scope: .core,
             message: "SDK Version - \(sdkVersion)"
         )
-
+        
         isInitialized = true
-
+        
+        userKit?.userManager.configure()
+                
         return shared
     }
         
@@ -122,10 +116,9 @@ public final class UserKit: NSObject {
         self.storage = Storage()
         self.webRTCClient = WebRTCClient()
         self.webSocket = WebSocket()
-        self.pushKitManager = PushKitManager()
-        self.callKitManager = CallKitManager()
-        self.availabilityManager = AvailabilityManager(apiClient: apiClient, storage: storage)
-        self.callManager = CallManager(apiClient: apiClient, webRTCClient: webRTCClient, webSocketClient: webSocket)
+        self.pushKitManager = PushKitManager(options: options)
+        self.callKitManager = CallKitManager(options: options)
+        self.callManager = CallManager(apiClient: apiClient, webRTCClient: webRTCClient, webSocketClient: webSocket, storage: storage)
         self.userManager = UserManager(apiClient: apiClient, callKitManager: callKitManager, callManager: callManager, pushKitManager: pushKitManager, storage: storage, webSocket: webSocket)
     }
     
@@ -145,11 +138,6 @@ public final class UserKit: NSObject {
             await userManager.identify(apiKey: apiKey, id: id, name: name, email: email)
         }
     }
-    
-    public func availability() async throws -> Availability {
-        try await availabilityManager.availability()
-    }
-    
     
     private static func objcConfigure(apiKey: String, options: UserKitOptions? = nil, completion: (() -> Void)? = nil) -> UserKit {
         guard userKit == nil else {

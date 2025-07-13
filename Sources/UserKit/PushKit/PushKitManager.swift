@@ -9,12 +9,27 @@ import Foundation
 import PushKit
 
 protocol PushKitManagerDelegate: AnyObject {
-    func pushKitManager(_ manager: PushKitManager, didReceiveIncomingPush payload: PKPushPayload)
+    func pushKitManager(_ manager: PushKitManager, didReceiveIncomingPush payload: PushKitManager.Payload)
     func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data)
-    func pushKitManager(_ manager: PushKitManager, didInvalidatePushToken token: Data)
+    func pushKitManagerDidInvalidatePushTokenFor(_ manager: PushKitManager)
 }
 
 class PushKitManager: NSObject {
+    
+    // MARK: - Types
+    
+    struct Payload: Codable {
+        struct Call: Codable {
+            struct Caller: Codable {
+                let name: String
+            }
+            let uuid: UUID
+            let url: URL
+            let state: String
+            let caller: Caller
+        }
+        let call: Call
+    }
     
     // MARK: - Properties
     
@@ -22,13 +37,12 @@ class PushKitManager: NSObject {
     
     private let pushRegistry: PKPushRegistry
     private let queue: DispatchQueue
-    
-    private(set) var currentToken: Data?
-    private(set) var isRegistered: Bool = false
-    
+    private let options: UserKitOptions
+        
     // MARK: - Initialization
     
-    init(queue: DispatchQueue = .main) {
+    init(options: UserKitOptions, queue: DispatchQueue = .main) {
+        self.options = options
         self.queue = queue
         self.pushRegistry = PKPushRegistry(queue: queue)
         super.init()
@@ -39,15 +53,15 @@ class PushKitManager: NSObject {
     // MARK: - Public Methods
     
     func register() {
-        guard !isRegistered else {
+        guard options.pushKit.enabled else {
             Logger.debug(
                 logLevel: .info,
                 scope: .pushKit,
-                message: "PushKit already registered for VoIP pushes"
+                message: "PushKit disabled, skipping registration"
             )
             return
         }
-        
+                
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
@@ -55,19 +69,9 @@ class PushKitManager: NSObject {
         )
         
         pushRegistry.desiredPushTypes = [.voIP]
-        isRegistered = true
     }
     
     func unregister() {
-        guard isRegistered else {
-            Logger.debug(
-                logLevel: .info,
-                scope: .pushKit,
-                message: "PushKit not registered, skipping unregister"
-            )
-            return
-        }
-        
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
@@ -75,8 +79,6 @@ class PushKitManager: NSObject {
         )
         
         pushRegistry.desiredPushTypes = []
-        isRegistered = false
-        currentToken = nil
     }
 }
 
@@ -95,9 +97,10 @@ extension PushKitManager: PKPushRegistryDelegate {
                 "token": pushCredentials.token.map { String(format: "%02.2hhx", $0) }.joined()
             ]
         )
-        
-        currentToken = pushCredentials.token
-        delegate?.pushKitManager(self, didUpdatePushToken: pushCredentials.token)
+                
+        Task { @MainActor in
+            self.delegate?.pushKitManager(self, didUpdatePushToken: pushCredentials.token)
+        }
     }
     
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
@@ -112,7 +115,22 @@ extension PushKitManager: PKPushRegistryDelegate {
             ]
         )
         
-        delegate?.pushKitManager(self, didReceiveIncomingPush: payload)
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload.dictionaryPayload)
+            let decoder = JSONDecoder()
+            let parsedPayload = try decoder.decode(Payload.self, from: data)
+            
+            Task { @MainActor in
+                self.delegate?.pushKitManager(self, didReceiveIncomingPush: parsedPayload)
+            }
+        } catch {
+            Logger.debug(
+                logLevel: .error,
+                scope: .pushKit,
+                message: "Failed to decode payload",
+                error: error
+            )
+        }
     }
     
     func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
@@ -121,16 +139,11 @@ extension PushKitManager: PKPushRegistryDelegate {
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
-            message: "VoIP push token invalidated",
-            info: [
-                "token": currentToken?.map { String(format: "%02.2hhx", $0) }.joined() ?? "unknown"
-            ]
+            message: "VoIP push token invalidated"
         )
         
-        if let token = currentToken {
-            delegate?.pushKitManager(self, didInvalidatePushToken: token)
+        Task { @MainActor in
+            self.delegate?.pushKitManagerDidInvalidatePushTokenFor(self)
         }
-        
-        currentToken = nil
     }
 }
