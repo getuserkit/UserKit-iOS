@@ -23,9 +23,13 @@ class PushKitManager: NSObject {
             struct Caller: Codable {
                 let name: String
             }
+            enum State: String, Codable {
+                case ringing
+                case ended
+            }
             let uuid: UUID
             let url: URL
-            let state: String
+            let state: State
             let caller: Caller
         }
         let call: Call

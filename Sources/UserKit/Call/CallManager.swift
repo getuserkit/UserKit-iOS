@@ -159,10 +159,13 @@ class CallManager {
         }
     }
     
+    func update(app: UserManager.App?) {
+        pictureInPictureViewController?.set(avatar: app?.iconUrl)
+    }
     
-    func update(state: Call?) {
+    func update(call: Call?) {
         self.state.mutate {
-            switch state {
+            switch call {
             case .some(let call):
                 $0 = .some(call)
             case .none:
@@ -177,8 +180,6 @@ class CallManager {
 
         addPictureInPictureViewController()
         
-        let start = Date()
-
         do {
             async let apiTask = apiClient.request(
                 accessToken: accessToken,
@@ -192,7 +193,7 @@ class CallManager {
 
             let (response, _) = try await (apiTask, webRTCTask)
             self.sessionId = response.sessionId
-
+            
             Logger.debug(
                 logLevel: .debug,
                 scope: .core,
@@ -207,16 +208,10 @@ class CallManager {
                 error: error
             )
         }
-        
-        await pushTracks()
-        
-        let elapsed = Date().timeIntervalSince(start)
-        if elapsed < 1 {
-            let remaining = UInt64((1 - elapsed) * 1_500_000_000)
-            try? await Task.sleep(nanoseconds: remaining)
-        }
-
-        await startPictureInPicture()
+                
+        async let result = startPictureInPicture()
+        async let pushTracks: Void = pushTracks()
+        _ = await (result, pushTracks)
     }
 
     func webSocketDidConnect() {
@@ -388,26 +383,9 @@ class CallManager {
             self.pictureInPictureViewController = nil
         }
     }
-        
-//    private func startPictureInPicture() {
-//        Task { @MainActor in
-//            await Task.yield() // yield to the run loop
-//
-//            guard let pictureInPictureViewController = pictureInPictureViewController else {
-//                return
-//            }
-//            
-//            guard !pictureInPictureViewController.pictureInPictureController.isPictureInPictureActive else {
-//                return
-//            }
-//
-//            DispatchQueue.main.async {
-//                pictureInPictureViewController.pictureInPictureController.startPictureInPicture()
-//            }
-//        }
-//    }
     
-    private func startPictureInPicture() async {
+    private func startPictureInPicture() async -> Bool {
+        try? await Task.sleep(nanoseconds: 100_000_000)
         await MainActor.run { [weak self] in
             guard let self = self,
                   let pictureInPictureViewController = self.pictureInPictureViewController else {
@@ -422,6 +400,8 @@ class CallManager {
         }) {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
+        
+        return true
     }
     
     private func stopPictureInPicture() async {

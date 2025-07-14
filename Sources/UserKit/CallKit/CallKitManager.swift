@@ -107,7 +107,6 @@ class CallKitManager: NSObject {
         let endCallAction = CXEndCallAction(call: uuid)
         let transaction = CXTransaction(action: endCallAction)
                 
-        
         do {
             try await callController.request(transaction)
             Logger.debug(

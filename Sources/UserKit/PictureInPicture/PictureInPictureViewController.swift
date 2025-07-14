@@ -39,7 +39,11 @@ final class PictureInPictureViewController: UIViewController {
     
     private var videoTrack: RTCVideoTrack? {
         didSet {
-            videoTrack?.add(pictureInPictureVideoCallViewController.videoView)
+            oldValue?.remove(pictureInPictureVideoCallViewController.videoView)
+            
+            if let videoTrack = videoTrack {
+                videoTrack.add(pictureInPictureVideoCallViewController.videoView)
+            }
         }
     }
                 
@@ -54,6 +58,26 @@ final class PictureInPictureViewController: UIViewController {
         // something about being a lazy var causes it not to start
         pictureInPictureController.delegate = self
         pictureInPictureController.canStartPictureInPictureAutomaticallyFromInline = false
+    }
+    
+    func set(avatar url: URL?) {
+        guard let url = url else {
+            pictureInPictureVideoCallViewController.iconImageView.image = nil
+            return
+        }
+        
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        pictureInPictureVideoCallViewController.iconImageView.image = image
+                    }
+                }
+            } catch {
+                print("Failed to load placeholder image: \(error)")
+            }
+        }
     }
         
     func set(track: RTCVideoTrack?) {
@@ -89,15 +113,39 @@ class PictureInPictureVideoCallViewController: AVPictureInPictureVideoCallViewCo
         videoView.translatesAutoresizingMaskIntoConstraints = false
         videoView.transform = CGAffineTransform(scaleX: -1, y: 1)
         videoView.backgroundColor = .systemBackground
+        videoView.layer.cornerRadius = 12
+        videoView.layer.masksToBounds = true
+        videoView.isHidden = true
         return videoView
     }()
-            
+    
+    lazy var iconImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.contentMode = .scaleAspectFit
+        imageView.backgroundColor = .clear
+        imageView.layer.cornerRadius = 12
+        imageView.layer.masksToBounds = true
+        return imageView
+    }()
+      
     // MARK: - Functions
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        view.layer.cornerRadius = 12
+        view.layer.masksToBounds = true
+        
+        view.addSubview(iconImageView)
         view.addSubview(videoView)
+        
+        NSLayoutConstraint.activate([
+            iconImageView.topAnchor.constraint(equalTo: view.topAnchor),
+            iconImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            iconImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            iconImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
         
         NSLayoutConstraint.activate([
             videoView.topAnchor.constraint(equalTo: view.topAnchor),

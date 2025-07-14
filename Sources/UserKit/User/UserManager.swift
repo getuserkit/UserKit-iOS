@@ -21,7 +21,12 @@ class UserManager {
 
     // MARK: - Types
     
+    struct App: Codable {
+        let iconUrl: URL?
+    }
+    
     struct User: Codable {
+        let app: App?
         let call: Call?
     }
     
@@ -72,9 +77,10 @@ class UserManager {
         state.onDidMutate = { [weak self] newState, oldState in
             switch newState {
             case .some(let state):
-                self?.callManager.update(state: state.call)
+                self?.callManager.update(app: state.app)
+                self?.callManager.update(call: state.call)
             case .none:
-                self?.callManager.update(state: nil)
+                self?.callManager.update(call: nil)
             }
         }
     }
@@ -292,7 +298,12 @@ extension UserManager: PushKitManagerDelegate {
             ]
         )
         
-        callKitManager.reportIncomingCall(uuid: payload.call.uuid, url: payload.call.url, caller: payload.call.caller.name, hasVideo: true)
+        switch payload.call.state {
+        case .ringing:
+            callKitManager.reportIncomingCall(uuid: payload.call.uuid, url: payload.call.url, caller: payload.call.caller.name, hasVideo: true)
+        case .ended:
+            Task { await callKitManager.endCall(uuid: payload.call.uuid) }
+        }
     }
     
     func pushKitManager(_ manager: PushKitManager, didUpdatePushToken token: Data) {
@@ -375,8 +386,6 @@ extension UserManager: CallKitManagerDelegate {
     }
     
     func callKitManager(_ manager: CallKitManager, didEndCall call: CallKitManager.Call) {
-        // Send an API request straight to the socket ending the call?
-        
         Logger.debug(
             logLevel: .info,
             scope: .pushKit,
@@ -386,6 +395,51 @@ extension UserManager: CallKitManagerDelegate {
                 "url": call.url
             ]
         )
+        
+        Task {
+            guard let accessToken = accessToken else {
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Cannot send call decline request without access token"
+                )
+                return
+            }
+            
+            do {
+                let endRequest = APIClient.EndRequest(
+                    type: "call.participant.end",
+                    data: APIClient.EndRequest.Data(uuid: call.uuid.uuidString)
+                )
+                
+                try await apiClient.request(
+                    accessToken: accessToken,
+                    endpoint: .end(call.url, endRequest),
+                    as: APIClient.EndResponse.self
+                )
+                
+                Logger.debug(
+                    logLevel: .info,
+                    scope: .core,
+                    message: "Successfully sent call end request",
+                    info: [
+                        "uuid": call.uuid.uuidString,
+                        "url": call.url.absoluteString
+                    ]
+                )
+            } catch {
+                Logger.debug(
+                    logLevel: .error,
+                    scope: .core,
+                    message: "Failed to send call end request",
+                    info: [
+                        "uuid": call.uuid.uuidString,
+                        "url": call.url.absoluteString
+                    ],
+                    error: error
+                )
+            }
+        }
     }
 }
 

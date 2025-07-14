@@ -33,7 +33,6 @@ actor APIClient {
         self.device = device
     }
     
-    
     func request<T: Decodable>(apiKey: String, endpoint: Route, as type: T.Type) async throws -> T {
         let data = try await performRequest(apiKey, endpoint)
         let decoder = JSONDecoder()
@@ -146,6 +145,7 @@ actor APIClient {
         case pullTracks(String, PullTracksRequest)
         case pushTracks(String, PushTracksRequest)
         case renegotiate(String, RenegotiateRequest)
+        case end(URL, EndRequest)
                 
         var url: String {
             switch self {
@@ -166,12 +166,15 @@ actor APIClient {
                 
             case .renegotiate(let sessionId, _):
                 "\(baseURL)/api/v1/calls/sessions/\(sessionId)/renegotiate"
+                
+            case .end(let url, _):
+                url.absoluteString.replacingOccurrences(of: "wss://", with: "https://").replacingOccurrences(of: "ws://", with: "http://")
             }
         }
         
         var method: Method {
             switch self {
-            case .postSession, .postUser, .postDevice, .pullTracks, .pushTracks:
+            case .postSession, .postUser, .postDevice, .pullTracks, .pushTracks, .end:
                 return .post
             case .renegotiate:
                 return .put
@@ -191,6 +194,8 @@ actor APIClient {
             case .pushTracks(_, let request):
                 return request
             case .renegotiate(_, let request):
+                return request
+            case .end(_, let request):
                 return request
             }
         }
@@ -306,4 +311,15 @@ actor APIClient {
     }
     
     struct RenegotiateResponse: Codable, Equatable {}
+    
+    struct EndRequest: Codable, Equatable {
+        let type: String
+        let data: Data
+        
+        struct Data: Codable, Equatable {
+            let uuid: String
+        }
+    }
+    
+    struct EndResponse: Codable, Equatable {}
 }
