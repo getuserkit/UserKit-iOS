@@ -1,7 +1,5 @@
 # UserKit
 
-(Please note, this is very much alpha-level software and has not been publicly released)
-
 Everything you need to talk to your users in just a few lines of code.
 
 UserKit is the easiest way to add real-time video support to your iOS app. 
@@ -38,11 +36,11 @@ import UserKit
 // Initialize with your API key
 UserKit.configure(apiKey: "your_api_key")
 
-// Identify the user in
-UserKit.shared.identify(id: "2", name: "Tom Nicholls", email: "tom@nicholls.com")
+// Identify your app user
+UserKit.shared.identify(id: "1", name: "Example User", email: "example@user.com")
 ```
 
 That's all that is required! 
 
-Now you can jump over to [getuserkit.com](https://getuserkit.com), find your logged in user and start talking to your users. 
+Now you can jump over to [getuserkit.com](https://getuserkit.com), find your logged in user and give them a call. 
 
