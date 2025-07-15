@@ -377,8 +377,38 @@ extension UserManager: CallKitManagerDelegate {
             ]
         )
         
+        guard let accessToken = accessToken else {
+            Logger.debug(
+                logLevel: .error,
+                scope: .core,
+                message: "Cannot answer call without access token"
+            )
+            return
+        }
+        
         Task {
             do {
+                let acceptRequest = APIClient.AcceptRequest(
+                    type: "call.participant.accept",
+                    data: APIClient.AcceptRequest.Data(uuid: call.uuid.uuidString)
+                )
+                
+                try await apiClient.request(
+                    accessToken: accessToken,
+                    endpoint: .accept(call.url, acceptRequest),
+                    as: APIClient.AcceptResponse.self
+                )
+                
+                Logger.debug(
+                    logLevel: .info,
+                    scope: .core,
+                    message: "Successfully sent call accept request",
+                    info: [
+                        "uuid": call.uuid.uuidString,
+                        "url": call.url.absoluteString
+                    ]
+                )
+                
                 try await connect(call: call)
                 await callManager.join()
             }
@@ -395,7 +425,7 @@ extension UserManager: CallKitManagerDelegate {
                 "url": call.url
             ]
         )
-        
+                
         Task {
             guard let accessToken = accessToken else {
                 Logger.debug(
@@ -449,6 +479,7 @@ extension UserManager: CallManagerDelegate {
     func callManager(_ manager: CallManager, didEndCall uuid: UUID) {
         Task {
             await callKitManager.endCall(uuid: uuid)
+            webSocket.disconnect()
         }
     }
 }

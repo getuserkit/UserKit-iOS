@@ -139,16 +139,15 @@ actor WebRTCClient {
         
         localTransceiversMap["video"] = transceiver
         
-        let parameters = transceiver.sender.parameters
-        
-        if let encoding = parameters.encodings.first {
-            encoding.maxBitrateBps = NSNumber(value: 8_000_000)
-            encoding.minBitrateBps = NSNumber(value: 3_000_000)
-            encoding.maxFramerate = NSNumber(value: 60)
-            encoding.scaleResolutionDownBy = NSNumber(value: 1.0)
-            parameters.encodings = [encoding]
-            transceiver.sender.parameters = parameters
-        }
+//        let parameters = transceiver.sender.parameters
+//        if let encoding = parameters.encodings.first {
+//            encoding.maxBitrateBps = NSNumber(value: 1_500_000)
+//            encoding.minBitrateBps = NSNumber(value: 300_000)
+//            encoding.maxFramerate = NSNumber(value: 15)
+//            encoding.scaleResolutionDownBy = NSNumber(value: 1.0)
+//            parameters.encodings = [encoding]
+//            transceiver.sender.parameters = parameters
+//        }
     }
     
     func replaceVideoTrack() {
@@ -174,16 +173,15 @@ actor WebRTCClient {
         
         localTransceiversMap["screenShare"] = transceiver
         
-        let parameters = transceiver.sender.parameters
-        
-        if let encoding = parameters.encodings.first {
-            encoding.maxBitrateBps = NSNumber(value: 8_000_000)
-            encoding.minBitrateBps = NSNumber(value: 3_000_000)
-            encoding.maxFramerate = NSNumber(value: 60)
-            encoding.scaleResolutionDownBy = NSNumber(value: 1.0)
-            parameters.encodings = [encoding]
-            transceiver.sender.parameters = parameters
-        }
+//        let parameters = transceiver.sender.parameters
+//        if let encoding = parameters.encodings.first {
+//            encoding.maxBitrateBps = NSNumber(value: 1_500_000)
+//            encoding.minBitrateBps = NSNumber(value: 300_000)
+//            encoding.maxFramerate = NSNumber(value: 15)
+//            encoding.scaleResolutionDownBy = NSNumber(value: 1.0)
+//            parameters.encodings = [encoding]
+//            transceiver.sender.parameters = parameters
+//        }
     }
     
     func createOffer() async throws -> SessionDescription {

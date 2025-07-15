@@ -145,6 +145,7 @@ actor APIClient {
         case pullTracks(String, PullTracksRequest)
         case pushTracks(String, PushTracksRequest)
         case renegotiate(String, RenegotiateRequest)
+        case accept(URL, AcceptRequest)
         case end(URL, EndRequest)
                 
         var url: String {
@@ -166,6 +167,9 @@ actor APIClient {
                 
             case .renegotiate(let sessionId, _):
                 "\(baseURL)/api/v1/calls/sessions/\(sessionId)/renegotiate"
+
+            case .accept(let url, _):
+                url.absoluteString.replacingOccurrences(of: "wss://", with: "https://").replacingOccurrences(of: "ws://", with: "http://")
                 
             case .end(let url, _):
                 url.absoluteString.replacingOccurrences(of: "wss://", with: "https://").replacingOccurrences(of: "ws://", with: "http://")
@@ -174,7 +178,7 @@ actor APIClient {
         
         var method: Method {
             switch self {
-            case .postSession, .postUser, .postDevice, .pullTracks, .pushTracks, .end:
+            case .postSession, .postUser, .postDevice, .pullTracks, .pushTracks, .accept, .end:
                 return .post
             case .renegotiate:
                 return .put
@@ -194,6 +198,8 @@ actor APIClient {
             case .pushTracks(_, let request):
                 return request
             case .renegotiate(_, let request):
+                return request
+            case .accept(_, let request):
                 return request
             case .end(_, let request):
                 return request
@@ -311,6 +317,17 @@ actor APIClient {
     }
     
     struct RenegotiateResponse: Codable, Equatable {}
+
+    struct AcceptRequest: Codable, Equatable {
+        let type: String
+        let data: Data
+        
+        struct Data: Codable, Equatable {
+            let uuid: String
+        }
+    }
+    
+    struct AcceptResponse: Codable, Equatable {}
     
     struct EndRequest: Codable, Equatable {
         let type: String
