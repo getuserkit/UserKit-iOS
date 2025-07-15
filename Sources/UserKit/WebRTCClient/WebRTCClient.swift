@@ -138,16 +138,6 @@ actor WebRTCClient {
         }
         
         localTransceiversMap["video"] = transceiver
-        
-//        let parameters = transceiver.sender.parameters
-//        if let encoding = parameters.encodings.first {
-//            encoding.maxBitrateBps = NSNumber(value: 1_500_000)
-//            encoding.minBitrateBps = NSNumber(value: 300_000)
-//            encoding.maxFramerate = NSNumber(value: 15)
-//            encoding.scaleResolutionDownBy = NSNumber(value: 1.0)
-//            parameters.encodings = [encoding]
-//            transceiver.sender.parameters = parameters
-//        }
     }
     
     func replaceVideoTrack() {
@@ -172,16 +162,6 @@ actor WebRTCClient {
         }
         
         localTransceiversMap["screenShare"] = transceiver
-        
-//        let parameters = transceiver.sender.parameters
-//        if let encoding = parameters.encodings.first {
-//            encoding.maxBitrateBps = NSNumber(value: 1_500_000)
-//            encoding.minBitrateBps = NSNumber(value: 300_000)
-//            encoding.maxFramerate = NSNumber(value: 15)
-//            encoding.scaleResolutionDownBy = NSNumber(value: 1.0)
-//            parameters.encodings = [encoding]
-//            transceiver.sender.parameters = parameters
-//        }
     }
     
     func createOffer() async throws -> SessionDescription {
@@ -315,7 +295,7 @@ actor WebRTCClient {
         let videoFrame = RTCVideoFrame(buffer: rtcPixelBuffer,
                                       rotation: RTCVideoRotation._90,
                                       timeStampNs: Int64(timeStampNs))
-        
+                
         videoSource!.capturer(videoCapturer!, didCapture: videoFrame)
     }
     

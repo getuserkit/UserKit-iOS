@@ -160,7 +160,7 @@ class CallManager {
     }
     
     func update(app: UserManager.App?) {
-        pictureInPictureViewController?.set(avatar: app?.iconUrl)
+//        pictureInPictureViewController?.set(avatar: app?.iconUrl)
     }
     
     func update(call: Call?) {
@@ -557,6 +557,12 @@ class CallManager {
             )
             
             try await webRTCClient.setRemoteDescription(.init(sdp: response.sessionDescription.sdp, type: .answer))
+            
+            Logger.debug(
+                logLevel: .debug,
+                scope: .core,
+                message: "Tracks pushed"
+            )
             
             try await updateParticipantTracks()
         } catch {
