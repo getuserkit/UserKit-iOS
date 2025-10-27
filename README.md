@@ -26,8 +26,8 @@
 |     | UserKit                                                                                                  |
 | --- | -------------------------------------------------------------------------------------------------------- |
 | 🖼️  | UserKit runs entirely inside a native Picture in Picture window, keeping your app’s interface untouched. |
+| 🖥️  | Watch how users actually use your app. See their screen and touches, live and in context.                |
 | 📞  | Full CallKit integration built in.                                                                       |
-| 🖥️  | Share user screens directly from within your app, see exactly where they tap.                            |
 | 📝  | [Online documentation](https://docs.getuserkit.com) up to date                                           |
 | 💯  | Well maintained - [frequent releases](https://github.com/getuserkit/UserKit-iOS/releases)                |
 | 📮  | Great support - email a founder: pete@getuserkit.com                                                     |
