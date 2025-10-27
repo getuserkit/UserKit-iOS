@@ -1,0 +1,71 @@
+name: Tests
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tests.yml'
+      - 'Package.swift'
+      - 'Sources/**/*.swift'
+      - 'Tests/**/*.swift'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Show Xcode version
+      run: xcodebuild -version
+
+    - name: List available simulators
+      run: xcrun simctl list devices available
+
+    - name: Get iPhone simulator ID
+      id: simulator
+      run: |
+        SIMULATOR_ID=$(xcrun simctl list devices available | grep -m 1 "iPhone" | grep -o "([A-F0-9-]*)" | tr -d "()")
+        echo "id=$SIMULATOR_ID" >> $GITHUB_OUTPUT
+        echo "Using simulator: $SIMULATOR_ID"
+
+    - name: Boot simulator
+      run: |
+        xcrun simctl boot ${{ steps.simulator.outputs.id }} || true
+        xcrun simctl bootstatus ${{ steps.simulator.outputs.id }}
+
+    - name: Run tests
+      run: |
+        set -o pipefail
+        xcodebuild test \
+          -scheme UserKit \
+          -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+          -enableCodeCoverage YES \
+          2>&1 | tee test-output.log
+      continue-on-error: false
+
+    - name: Show test summary
+      if: always()
+      run: |
+        echo "=== Test Summary ==="
+        grep "Test Suite" test-output.log || true
+        grep "Executed" test-output.log || true
+        grep "SUCCEEDED\|FAILED" test-output.log || true
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          test-output.log
+          ~/Library/Developer/Xcode/DerivedData/*/Logs/Test/*.xcresult
+        retention-days: 30
+        if-no-files-found: warn
