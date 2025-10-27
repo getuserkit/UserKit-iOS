@@ -10,7 +10,7 @@ import UIKit
 import SwiftUI
 
 internal let sdkVersion = """
-0.1.0
+1.0.0
 """
 
 @objcMembers
