@@ -407,7 +407,7 @@ final class Call {
 
         audioSession.lockForConfiguration()
         do {
-            try audioSession.setCategory(.playAndRecord, mode: .videoChat, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setCategory(.playAndRecord, mode: .videoChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
         } catch {
             print("Failed to configure audio session: \(error)")
         }
