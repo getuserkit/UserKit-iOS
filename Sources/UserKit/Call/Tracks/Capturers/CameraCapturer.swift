@@ -49,16 +49,7 @@ class CameraCapturer: VideoCapturer, @unchecked Sendable {
         // Already started
         guard didStart else { return false }
 
-        var devices: [AVCaptureDevice]
-        if AVCaptureMultiCamSession.isMultiCamSupported {
-            // Get the list of devices already on the shared multi-cam session.
-            let existingDevices = capturer.captureSession.inputs.compactMap { $0 as? AVCaptureDeviceInput }.map(\.device)
-            // Compute other multi-cam compatible devices.
-            devices = try await DeviceManager.shared.multiCamCompatibleDevices(for: Set(existingDevices))
-        } else {
-            devices = try await CameraCapturer.captureDevices()
-        }
-
+        let devices = try await CameraCapturer.captureDevices()
         let device = devices.first { $0.position == .front } ?? devices.first
 
         guard let device else {
@@ -102,6 +93,10 @@ class CameraCapturer: VideoCapturer, @unchecked Sendable {
         }
         
         try await capturer.startCapture(with: device, format: selectedFormat.format, fps: selectedFps)
+
+        if #available(iOS 16.0, *) {
+            capturer.captureSession.isMultitaskingCameraAccessEnabled = true
+        }
 
         cameraCapturerState.mutate { $0.device = device }
 

@@ -55,10 +55,16 @@ class User: Participant, @unchecked Sendable {
         try await call.transportShouldNegotiate()
                 
         let publication = LocalTrackPublication(id: track.mediaTrack.trackId, name: track.mediaTrack.trackId, kind: track.kind, source: track.source, participant: self)
+
+        publication.muteDidChange = { [weak self, weak publication] in
+            guard let self, let publication else { return }
+            Task { await self.muteDidChange?(publication) }
+        }
+
         await publication.set(track: track)
 
         add(publication: publication)
-        
+
         return publication
     }
         
@@ -183,6 +189,15 @@ class User: Participant, @unchecked Sendable {
             switch source {
             case .camera:
                 let localTrack = LocalVideoTrack.createCameraTrack(isMuted: true)
+                localTrack.willStart = { [weak self] in
+                    try await self?.willStart?(localTrack)
+                }
+                localTrack.didStart = { [weak self] in
+                    try await self?.didStart?(localTrack)
+                }
+                localTrack.didStop = { [weak self] in
+                    try await self?.didStop?(localTrack)
+                }
                 try await localTrack.start()
                 try Task.checkCancellation()
                 let publication = try await self.publish(track: localTrack)

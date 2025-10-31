@@ -93,6 +93,8 @@ class TrackPublication: NSObject, @unchecked Sendable, ObservableObject {
                     data: .updateTrack(.init(transceiverSessionId: sessionId, track: messageTrack))
                 )
             )
+
+            self.muteDidChange?()
         }
 
         return oldValue
