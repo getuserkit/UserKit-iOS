@@ -9,6 +9,7 @@ import AVKit
 import UIKit
 import SwiftUI
 import WebRTC
+import Accelerate
 
 protocol PictureInPictureViewControllerDelegate: AnyObject {
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController) async -> Bool
@@ -313,27 +314,27 @@ class PictureInPictureFrameRender : NSObject, RTCVideoRenderer {
     private func createPixelBuffer(from i420Buffer: RTCI420Buffer) -> CVPixelBuffer? {
         var width = Int(i420Buffer.width)
         var height = Int(i420Buffer.height)
-        
+
         if width%2 != 0 {
             width += 1
         }
         if height%2 != 0 {
             height += 1
         }
-        
+
         let tempKey = "\(width)_\(height)"
         if tempKey != pixelBufferKey {
             pixelBuffer = nil
             pixelBufferKey = tempKey
         }
-        
+
         if pixelBuffer == nil {
             let attributes: [String: Any] = [
                 kCVPixelBufferCGImageCompatibilityKey as String: true,
                 kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [:]
             ]
-            
+
             let status = CVPixelBufferCreate(
                 kCFAllocatorDefault,
                 width,
@@ -346,54 +347,74 @@ class PictureInPictureFrameRender : NSObject, RTCVideoRenderer {
                 return nil
             }
         }
-        
-        
+
         guard let createdPixelBuffer = pixelBuffer else {
             return nil
         }
-        
+
         CVPixelBufferLockBaseAddress(createdPixelBuffer, [])
-        
+
         if let yBaseAddress = CVPixelBufferGetBaseAddressOfPlane(createdPixelBuffer, 0) {
             let yDestination = yBaseAddress.assumingMemoryBound(to: UInt8.self)
             let ySource = i420Buffer.dataY
             let yStride = CVPixelBufferGetBytesPerRowOfPlane(createdPixelBuffer, 0)
-            
-            for row in 0..<height {
-                for col in 0..<width {
-                    if flipFrame {
-                        let flippedCol = Int(i420Buffer.width) - 1 - col
-                        yDestination[row * yStride + col] = ySource[row * Int(i420Buffer.strideY) + flippedCol]
-                    } else {
-                        yDestination[row * yStride + col] = ySource[row * Int(i420Buffer.strideY) + col]
-                    }
-                }
+            let sourceYStride = Int(i420Buffer.strideY)
+
+            var srcBuffer = vImage_Buffer(
+                data: UnsafeMutableRawPointer(mutating: ySource),
+                height: vImagePixelCount(height),
+                width: vImagePixelCount(width),
+                rowBytes: sourceYStride
+            )
+
+            var destBuffer = vImage_Buffer(
+                data: yDestination,
+                height: vImagePixelCount(height),
+                width: vImagePixelCount(width),
+                rowBytes: yStride
+            )
+
+            if flipFrame {
+                vImageHorizontalReflect_Planar8(&srcBuffer, &destBuffer, vImage_Flags(kvImageNoFlags))
+            } else {
+                vImageCopyBuffer(&srcBuffer, &destBuffer, 1, vImage_Flags(kvImageNoFlags))
             }
         }
-        
+
         if let uvBaseAddress = CVPixelBufferGetBaseAddressOfPlane(createdPixelBuffer, 1) {
             let uvDestination = uvBaseAddress.assumingMemoryBound(to: UInt8.self)
             let uSource = i420Buffer.dataU
             let vSource = i420Buffer.dataV
             let uvStride = CVPixelBufferGetBytesPerRowOfPlane(createdPixelBuffer, 1)
-            
-            for row in 0..<height / 2 {
-                for col in 0..<width / 2 {
-                    let uvIndex = row * uvStride + col * 2
-                    if flipFrame {
-                        let flippedCol = Int(i420Buffer.width/2) - 1 - col
-                        uvDestination[uvIndex] = uSource[row * Int(i420Buffer.strideU) + flippedCol]
-                        uvDestination[uvIndex + 1] = vSource[row * Int(i420Buffer.strideV) + flippedCol]
-                    }else {
-                        uvDestination[uvIndex] = uSource[row * Int(i420Buffer.strideU) + col]
-                        uvDestination[uvIndex + 1] = vSource[row * Int(i420Buffer.strideV) + col]
+            let chromaWidth = width / 2
+            let chromaHeight = height / 2
+            let sourceUVStride = Int(i420Buffer.strideU)
+
+            if flipFrame {
+                for row in 0..<chromaHeight {
+                    for col in 0..<chromaWidth {
+                        let flippedCol = chromaWidth - 1 - col
+                        let uvIndex = row * uvStride + col * 2
+                        uvDestination[uvIndex] = uSource[row * sourceUVStride + flippedCol]
+                        uvDestination[uvIndex + 1] = vSource[row * sourceUVStride + flippedCol]
+                    }
+                }
+            } else {
+                for row in 0..<chromaHeight {
+                    let srcURow = uSource.advanced(by: row * sourceUVStride)
+                    let srcVRow = vSource.advanced(by: row * sourceUVStride)
+                    let dstUVRow = uvDestination.advanced(by: row * uvStride)
+
+                    for col in 0..<chromaWidth {
+                        dstUVRow[col * 2] = srcURow[col]
+                        dstUVRow[col * 2 + 1] = srcVRow[col]
                     }
                 }
             }
         }
-        
+
         CVPixelBufferUnlockBaseAddress(createdPixelBuffer, [])
-        
+
         return createdPixelBuffer
     }
     
