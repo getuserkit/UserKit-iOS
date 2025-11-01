@@ -247,8 +247,6 @@ class PictureInPictureFrameRender : NSObject, RTCVideoRenderer {
 
     var pixelBufferKey: String?
 
-    private var pixelBufferPool: CVPixelBufferPool?
-
     private var frameProcessingQueue = DispatchQueue(label: "FrameProcessingQueue")
 
     private let synchronizationQueue = DispatchQueue(label: "com.userkit.synchronizationQueue")
