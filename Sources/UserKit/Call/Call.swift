@@ -529,12 +529,31 @@ extension Call: PictureInPictureViewControllerDelegate {
             options.forEach { alertAction in
                 alertController.addAction(alertAction)
             }
-            alertController.preferredAction = options.first
+            alertController.preferredAction = options.last
             viewController.present(alertController, animated: true)
         }
                 
         await presentAlert(title: "Continue Call", message: "You are in a call with Peter", options: [
-            await UIAlertAction(title: "End Call", style: .destructive) { [weak self] alertAction in
+            UIAlertAction(title: user.isCameraEnabled ? "Disable Camera" : "Enable Camera", style: .default) { [weak self] alertAction in
+                Task {
+                    Task {
+                        try await self?.user.setCamera(enabled: (self?.user.isCameraEnabled ?? true) ? false : true)
+                        await self?.startPictureInPicture()
+                    }
+                }
+            },
+            UIAlertAction(title: user.isScreenShareEnabled ? "Disable Screen Sharing" : "Enable Screen Sharing", style: .default) { [weak self] alertAction in
+                guard let self = self else { return }
+                Task {
+                    if self.user.isScreenShareEnabled {
+                        try await self.user.setScreenShare(enabled: false)
+                        await self.startPictureInPicture()
+                    } else {
+                        try await self.user.setScreenShare(enabled: true)
+                    }
+                }
+            },
+            UIAlertAction(title: "End Call", style: .destructive) { [weak self] alertAction in
                 guard let self = self else { return }
                 Task {
                     try await self.end(uuid: self.uuid)
@@ -545,7 +564,7 @@ extension Call: PictureInPictureViewControllerDelegate {
                     await self?.startPictureInPicture()
                     await self?.setPictureInPictureTrack()
                 }
-            },
+            }
         ])
         
         return true
