@@ -14,9 +14,12 @@ class ParticipantView {
     let videoDisplayView: SampleBufferVideoCallView
     let avatarView: AvatarView
     let muteImageView: UIImageView
+    let speakingImageView: UIImageView
     var frameRenderer: PictureInPictureFrameRender?
 
     private weak var participant: Participant?
+    private let audioLevelThreshold: Float = 0.01
+    private var isMuted: Bool = true
 
     init() {
         self.videoDisplayView = SampleBufferVideoCallView()
@@ -29,6 +32,13 @@ class ParticipantView {
         muteImageView.image = UIImage(systemName: "microphone.slash")
         muteImageView.translatesAutoresizingMaskIntoConstraints = false
         muteImageView.tintColor = .white
+        muteImageView.alpha = 0.0
+
+        self.speakingImageView = UIImageView(frame: .zero)
+        speakingImageView.image = UIImage(systemName: "microphone.fill")
+        speakingImageView.translatesAutoresizingMaskIntoConstraints = false
+        speakingImageView.tintColor = .white
+        speakingImageView.alpha = 0.0
     }
 
     func configure(participant: Participant) {
@@ -37,7 +47,20 @@ class ParticipantView {
         avatarView.set(backgroundColor: participant.avatarColor)
         avatarView.set(initials: participant.label)
         avatarView.isHidden = participant.isCameraEnabled
-        muteImageView.isHidden = participant.isMicrophoneEnabled
+
+        self.isMuted = !participant.isMicrophoneEnabled
+        muteImageView.alpha = participant.isMicrophoneEnabled ? 0.0 : 1.0
+    }
+
+    func updateMuteState(isMuted: Bool) {
+        self.isMuted = isMuted
+
+        UIView.animate(withDuration: 0.2) {
+            self.muteImageView.alpha = isMuted ? 1.0 : 0.0
+            if isMuted {
+                self.speakingImageView.alpha = 0.0
+            }
+        }
     }
 
     func setVideoTrack(_ track: RTCVideoTrack?, oldTrack: RTCVideoTrack?) {
@@ -64,6 +87,7 @@ class ParticipantView {
         parentView.addSubview(videoDisplayView)
         parentView.addSubview(avatarView)
         parentView.addSubview(muteImageView)
+        parentView.addSubview(speakingImageView)
 
         NSLayoutConstraint.activate([
             videoDisplayView.topAnchor.constraint(equalTo: topAnchor),
@@ -80,11 +104,33 @@ class ParticipantView {
         ])
 
         NSLayoutConstraint.activate([
-            muteImageView.widthAnchor.constraint(equalToConstant: 22),
-            muteImageView.heightAnchor.constraint(equalToConstant: 22),
+            muteImageView.widthAnchor.constraint(equalToConstant: 16),
+            muteImageView.heightAnchor.constraint(equalToConstant: 16),
             muteImageView.leadingAnchor.constraint(equalTo: videoDisplayView.leadingAnchor, constant: 8),
             muteImageView.bottomAnchor.constraint(equalTo: videoDisplayView.bottomAnchor, constant: -8)
         ])
+
+        NSLayoutConstraint.activate([
+            speakingImageView.widthAnchor.constraint(equalToConstant: 16),
+            speakingImageView.heightAnchor.constraint(equalToConstant: 16),
+            speakingImageView.leadingAnchor.constraint(equalTo: videoDisplayView.leadingAnchor, constant: 8),
+            speakingImageView.bottomAnchor.constraint(equalTo: videoDisplayView.bottomAnchor, constant: -8)
+        ])
+    }
+
+    func updateAudioLevel(_ level: Float) {
+        guard !isMuted else {
+            UIView.animate(withDuration: 0.2) {
+                self.speakingImageView.alpha = 0.0
+            }
+            return
+        }
+
+        let isSpeaking = level > audioLevelThreshold
+
+        UIView.animate(withDuration: 0.2) {
+            self.speakingImageView.alpha = isSpeaking ? 1.0 : 0.0
+        }
     }
 
     func clean() {

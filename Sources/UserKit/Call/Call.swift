@@ -226,13 +226,27 @@ final class Call {
             guard let transceiver = peerConnection.transceivers.first(where: { $0.receiver.receiverId == rtpReceiver.receiverId }) else {
                 return
             }
-            
+
             let hosts = self.state.read({ $0.hosts })
             for host in hosts {
                 for (_, publication) in host.trackPublications {
-                    if publication.state.read({ $0.mid }) == transceiver.mid {
-                        guard let receivedTrack = rtpReceiver.track else { continue }
-                        let remoteTrack = Track(name: publication.name, kind: publication.kind, source: publication.source, track: receivedTrack, isMuted: publication.isMuted)
+                    let pubMid = publication.state.read({ $0.mid })
+                    if pubMid == transceiver.mid {
+                        guard let receivedTrack = rtpReceiver.track else {
+                            continue
+                        }
+
+                        let remoteTrack: Track
+                        switch publication.kind {
+                        case .audio:
+                            remoteTrack = RemoteAudioTrack(name: publication.name, track: receivedTrack, isMuted: publication.isMuted)
+                        case .video:
+                            remoteTrack = RemoteVideoTrack(name: publication.name, source: publication.source, track: receivedTrack, isMuted: publication.isMuted)
+                        case .none:
+                            continue
+                        }
+
+                        remoteTrack.set(rtpSender: transceiver.sender, transceiver: transceiver, transport: transport)
                         await publication.set(track: remoteTrack)
                         return
                     }
