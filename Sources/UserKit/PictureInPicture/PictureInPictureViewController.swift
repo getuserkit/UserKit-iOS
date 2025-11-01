@@ -112,6 +112,12 @@ final class PictureInPictureViewController: UIViewController {
 
         pictureInPictureVideoCallViewController.userView.configure(participant: user)
 
+        if let cameraPublication = user.getTrackPublication(source: .camera),
+           let videoTrack = cameraPublication.track?.mediaTrack as? RTCVideoTrack {
+            localVideoTrack = videoTrack
+            pictureInPictureVideoCallViewController.userView.avatarView.isHidden = !cameraPublication.isMuted
+        }
+
         user.muteDidChange = { [weak self] publication in
             switch publication.source {
             case .microphone:
