@@ -59,6 +59,8 @@ class Participant: NSObject, @unchecked Sendable {
         
     var muteDidChange: ((TrackPublication) async -> Void)?
 
+    var audioLevelDidChange: ((Float) async -> Void)?
+
     // MARK: - Functions
     
     init(id: String, firstName: String?, lastName: String?, call: Call) {

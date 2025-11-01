@@ -64,13 +64,20 @@ class TrackPublication: NSObject, @unchecked Sendable, ObservableObject {
         guard track != newValue else { return oldValue }
 
         oldValue?.muteDidChange = nil
+        oldValue?.audioLevelDidChange = nil
 
         state.mutate { $0.track = newValue }
 
         guard let newTrack = newValue else { return oldValue }
-        
+
         muteDidChange?()
-        
+
+        if newTrack.kind == .audio {
+            newTrack.audioLevelDidChange = { [weak self] level in
+                await self?.participant?.audioLevelDidChange?(level)
+            }
+        }
+
         guard newTrack is LocalTrack else { return newTrack }
 
         newTrack.muteDidChange = { [weak self, weak newTrack] in

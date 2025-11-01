@@ -83,7 +83,7 @@ final class PictureInPictureViewController: UIViewController {
             switch publication.source {
             case .microphone:
                 await MainActor.run {
-                    self?.pictureInPictureVideoCallViewController.hostView.muteImageView.isHidden = !publication.isMuted
+                    self?.pictureInPictureVideoCallViewController.hostView.updateMuteState(isMuted: publication.isMuted)
                 }
             case .camera:
                 await MainActor.run {
@@ -94,6 +94,12 @@ final class PictureInPictureViewController: UIViewController {
                 }
             default:
                 break
+            }
+        }
+
+        host.audioLevelDidChange = { [weak self] level in
+            await MainActor.run {
+                self?.pictureInPictureVideoCallViewController.hostView.updateAudioLevel(level)
             }
         }
     }
@@ -109,7 +115,7 @@ final class PictureInPictureViewController: UIViewController {
             switch publication.source {
             case .microphone:
                 await MainActor.run {
-                    self?.pictureInPictureVideoCallViewController.userView.muteImageView.isHidden = !publication.isMuted
+                    self?.pictureInPictureVideoCallViewController.userView.updateMuteState(isMuted: publication.isMuted)
                 }
             case .camera:
                 await MainActor.run {
@@ -120,6 +126,12 @@ final class PictureInPictureViewController: UIViewController {
                 }
             default:
                 break
+            }
+        }
+
+        user.audioLevelDidChange = { [weak self] level in
+            await MainActor.run {
+                self?.pictureInPictureVideoCallViewController.userView.updateAudioLevel(level)
             }
         }
     }

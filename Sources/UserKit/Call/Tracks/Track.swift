@@ -81,16 +81,20 @@ class Track: NSObject, @unchecked Sendable {
     }
     
     typealias MuteDidChange = @Sendable () async throws -> Void
-    
+
+    typealias AudioLevelDidChange = @Sendable (Float) async -> Void
+
     // MARK: - Properties
-    
+
     static let cameraName = "camera"
-    
+
     static let microphoneName = "microphone"
-    
+
     static let screenShareVideoName = "screen_share"
-    
+
     var muteDidChange: MuteDidChange?
+
+    var audioLevelDidChange: AudioLevelDidChange?
         
     let mediaTrack: RTCMediaStreamTrack
     
@@ -111,23 +115,25 @@ class Track: NSObject, @unchecked Sendable {
     var didStart: (() async throws -> Void)?
     
     var didStop: (() async throws -> Void)?
-    
+
     private let startStopSerialRunner = SerialRunnerActor<Void>()
-    
-    private let statisticsTimer = AsyncTimer(interval: 1.0)
+
+    private let statisticsTimer = AsyncTimer(interval: 0.1)
+
+    private var lastPacketCount: UInt32 = 0
     
     // MARK: - Functions
     
     init(name: String, kind: Kind, source: Source, track: RTCMediaStreamTrack, isMuted: Bool) {
         self.mediaTrack = track
         self.state = .init(.init(isMuted: isMuted, kind: kind, name: name, source: source))
-        
+
         super.init()
-        
+
         statisticsTimer.setTimerBlock { [weak self] in
-//            await self?.reportStatistics()
+            await self?.reportStatistics()
         }
-        
+
         statisticsTimer.restart()
     }
         
@@ -211,13 +217,38 @@ class Track: NSObject, @unchecked Sendable {
 
 extension Track {
     func reportStatistics() async {
-        let (transport, rtpSender) = state.read { ($0.transport, $0.rtpSender ) }
+        guard kind == .audio else { return }
 
-        guard let transport else { return }
+        let (transport, transceiver) = state.read { ($0.transport, $0.transceiver) }
 
-        if let rtpSender = rtpSender {
-            let statisticsReport = await transport.statistics(for: rtpSender)
-            print("statisticsReport \(source.type), \(mediaTrack.isEnabled), \(mediaTrack.readyState == .live)", statisticsReport)
+        guard let transport, let transceiver else { return }
+
+        let statisticsReport: RTCStatisticsReport
+        if self is RemoteTrack {
+            statisticsReport = await transport.statistics(for: transceiver.receiver)
+        } else {
+            statisticsReport = await transport.statistics(for: transceiver.sender)
         }
+
+        if let audioLevel = extractAudioLevel(from: statisticsReport) {
+            await audioLevelDidChange?(audioLevel)
+        }
+    }
+
+    private func extractAudioLevel(from report: RTCStatisticsReport) -> Float? {
+        for (_, stats) in report.statistics {
+            if let audioLevel = stats.values["audioLevel"] as? NSNumber {
+                return audioLevel.floatValue
+            }
+
+            if let audioInputLevel = stats.values["audioInputLevel"] as? NSNumber {
+                return audioInputLevel.floatValue
+            }
+
+            if let audioOutputLevel = stats.values["audioOutputLevel"] as? NSNumber {
+                return audioOutputLevel.floatValue
+            }
+        }
+        return nil
     }
 }
