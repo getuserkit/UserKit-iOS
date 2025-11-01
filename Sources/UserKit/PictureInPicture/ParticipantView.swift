@@ -69,8 +69,7 @@ class ParticipantView {
     func setVideoTrack(_ track: RTCVideoTrack?, oldTrack: RTCVideoTrack?) {
         if let track = track {
             let renderer = PictureInPictureFrameRender(
-                displayLayer: videoDisplayView.sampleBufferDisplayLayer,
-                flipFrame: true
+                displayLayer: videoDisplayView.sampleBufferDisplayLayer
             )
 
             frameRenderer?.clean()
@@ -83,6 +82,14 @@ class ParticipantView {
                     oldTrack.remove(renderer)
                 }
             }
+        }
+    }
+
+    func setFlipped(_ flipped: Bool) {
+        if flipped {
+            videoDisplayView.transform = CGAffineTransform(scaleX: -1, y: 1)
+        } else {
+            videoDisplayView.transform = .identity
         }
     }
 
