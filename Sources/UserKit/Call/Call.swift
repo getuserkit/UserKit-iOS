@@ -259,15 +259,18 @@ final class Call {
             case .screenShareVideo:
                 await self?.addPictureInPictureViewController()
                 await self?.pictureInPictureViewController?.set(host: self?.state.hosts.first)
+                await self?.pictureInPictureViewController?.set(user: self?.user)
                 try await Task.sleep(nanoseconds: 500_000_000)
                 await self?.startPictureInPicture()
                 await self?.setPictureInPictureTrack()
                 TouchIndicator.enabled = .always
+            case .camera:
+                await self?.pictureInPictureViewController?.set(user: self?.user)
             default:
                 break
             }
         }
-        
+
         user.didStop = { track in
             switch track.source {
             case .screenShareVideo:
@@ -334,6 +337,7 @@ final class Call {
 
         async let pictureInPictureTask: Void = {
             await addPictureInPictureViewController()
+            await pictureInPictureViewController?.set(user: user)
             await pictureInPictureViewController?.set(host: state.hosts.first)
             await startPictureInPicture()
         }()
@@ -438,7 +442,7 @@ extension Call {
         viewController.view.addSubview(pictureInPictureViewController.view)
         pictureInPictureViewController.view.isUserInteractionEnabled = false
         pictureInPictureViewController.view.isHidden = false
-        pictureInPictureViewController.view.frame = .init(x: viewController.view.frame.width - (80 + 10), y: viewController.view.safeAreaInsets.top, width: 80, height: 80)
+        pictureInPictureViewController.view.frame = .init(x: viewController.view.frame.width - 1, y: viewController.view.safeAreaInsets.top, width: 1, height: 1)
         pictureInPictureViewController.didMove(toParent: viewController)
         
         viewController.view.layoutIfNeeded()
@@ -579,20 +583,6 @@ extension Call: AppStateDelegate {
                 data: .updateParticipant(.init(appState: "background"))
             ))
         }
-        
-        let videoTracks = user.localVideoTracks
-
-        guard !videoTracks.isEmpty else { return }
-
-        Task.detached {
-            for videoTrack in videoTracks {
-                do {
-                    try await videoTrack.suspend()
-                } catch {
-                    Logger.debug(logLevel: .error, scope: .core, message: "Failed to suspend video track with error: \(error)")
-                }
-            }
-        }
     }
 
     func appWillEnterForeground() {
@@ -601,20 +591,6 @@ extension Call: AppStateDelegate {
                 type: .updateParticipant,
                 data: .updateParticipant(.init(appState: "foreground"))
             ))
-        }
-        
-        let videoTracks = user.localVideoTracks
-
-        guard !videoTracks.isEmpty else { return }
-
-        Task.detached {
-            for videoTrack in videoTracks {
-                do {
-                    try await videoTrack.resume()
-                } catch {
-                    Logger.debug(logLevel: .error, scope: .core, message: "Failed to resumed video track with error: \(error)")
-                }
-            }
         }
     }
 
