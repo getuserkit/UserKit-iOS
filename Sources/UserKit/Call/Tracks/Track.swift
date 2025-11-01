@@ -120,8 +120,6 @@ class Track: NSObject, @unchecked Sendable {
 
     private let statisticsTimer = AsyncTimer(interval: 0.1)
 
-    private var lastPacketCount: UInt32 = 0
-    
     // MARK: - Functions
     
     init(name: String, kind: Kind, source: Source, track: RTCMediaStreamTrack, isMuted: Bool) {
