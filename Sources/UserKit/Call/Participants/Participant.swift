@@ -97,32 +97,40 @@ class Participant: NSObject, @unchecked Sendable {
 }
 
 extension Participant {
-    var initials: String {
+    var label: String {
+        if self is User {
+            return "You"
+        }
+
         let firstInitial = firstName?.first.map { String($0) } ?? ""
         let lastInitial = lastName?.first.map { String($0) } ?? ""
-        
+
         let combined = (firstInitial + lastInitial).uppercased()
-        
+
         if combined.isEmpty {
             return ""
         }
-        
+
         return combined
     }
-    
+
     var avatarColor: UIColor {
+        if self is User {
+            return UIColor(red: 0.89, green: 0.47, blue: 0.33, alpha: 1.0)
+        }
+
         let colors: [UIColor] = [
             UIColor(red: 0xE0/255.0, green: 0x77/255.0, blue: 0x57/255.0, alpha: 1.0),
             UIColor(red: 0x5F/255.0, green: 0xC2/255.0, blue: 0x80/255.0, alpha: 1.0),
             UIColor(red: 0xEB/255.0, green: 0xD3/255.0, blue: 0x58/255.0, alpha: 1.0),
             UIColor(red: 0xEF/255.0, green: 0x44/255.0, blue: 0x44/255.0, alpha: 1.0),
             UIColor(red: 0x8B/255.0, green: 0x5C/255.0, blue: 0xF6/255.0, alpha: 1.0),
-            UIColor(red: 0x62/255.0, green: 0x86/255.0, blue: 0xCE/255.0, alpha: 1.0) 
+            UIColor(red: 0x62/255.0, green: 0x86/255.0, blue: 0xCE/255.0, alpha: 1.0)
         ]
-        
+
         let idString = String(describing: id)
         let hash = idString.unicodeScalars.reduce(0) { $0 + Int($1.value) }
-        
+
         return colors[hash % colors.count]
     }
 }
