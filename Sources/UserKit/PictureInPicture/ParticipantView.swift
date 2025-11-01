@@ -18,8 +18,11 @@ class ParticipantView {
     var frameRenderer: PictureInPictureFrameRender?
 
     private weak var participant: Participant?
-    private let audioLevelThreshold: Float = 0.01
+    private let audioLevelThresholdInitial: Float = 0.1
+    private let audioLevelThresholdSpeaking: Float = 0.02
     private var isMuted: Bool = true
+    private var isSpeaking: Bool = false
+    private var hideIndicatorTask: Task<Void, Never>?
 
     init() {
         self.videoDisplayView = SampleBufferVideoCallView()
@@ -120,20 +123,45 @@ class ParticipantView {
 
     func updateAudioLevel(_ level: Float) {
         guard !isMuted else {
+            hideIndicatorTask?.cancel()
+            hideIndicatorTask = nil
+            isSpeaking = false
             UIView.animate(withDuration: 0.2) {
                 self.speakingImageView.alpha = 0.0
             }
             return
         }
 
-        let isSpeaking = level > audioLevelThreshold
+        let threshold = isSpeaking ? audioLevelThresholdSpeaking : audioLevelThresholdInitial
+        let audioLevelAboveThreshold = level > threshold
 
-        UIView.animate(withDuration: 0.2) {
-            self.speakingImageView.alpha = isSpeaking ? 1.0 : 0.0
+        if audioLevelAboveThreshold {
+            hideIndicatorTask?.cancel()
+            hideIndicatorTask = nil
+            isSpeaking = true
+
+            UIView.animate(withDuration: 0.2) {
+                self.speakingImageView.alpha = 1.0
+            }
+        } else if hideIndicatorTask == nil {
+            hideIndicatorTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    self?.isSpeaking = false
+                    UIView.animate(withDuration: 0.2) {
+                        self?.speakingImageView.alpha = 0.0
+                    }
+                    self?.hideIndicatorTask = nil
+                }
+            }
         }
     }
 
     func clean() {
+        hideIndicatorTask?.cancel()
+        hideIndicatorTask = nil
         frameRenderer?.clean()
         frameRenderer = nil
     }

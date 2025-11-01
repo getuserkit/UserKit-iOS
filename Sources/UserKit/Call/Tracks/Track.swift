@@ -118,7 +118,7 @@ class Track: NSObject, @unchecked Sendable {
 
     private let startStopSerialRunner = SerialRunnerActor<Void>()
 
-    private let statisticsTimer = AsyncTimer(interval: 0.1)
+    private let statisticsTimer = AsyncTimer(interval: 1.0 / 60.0)
 
     // MARK: - Functions
     
