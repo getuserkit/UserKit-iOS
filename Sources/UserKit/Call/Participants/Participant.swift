@@ -115,6 +115,10 @@ extension Participant {
     }
 
     var avatarColor: UIColor {
+        if self is User {
+            return UIColor(red: 0.89, green: 0.47, blue: 0.33, alpha: 1.0)
+        }
+
         let colors: [UIColor] = [
             UIColor(red: 0xE0/255.0, green: 0x77/255.0, blue: 0x57/255.0, alpha: 1.0),
             UIColor(red: 0x5F/255.0, green: 0xC2/255.0, blue: 0x80/255.0, alpha: 1.0),
