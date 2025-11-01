@@ -590,6 +590,7 @@ extension Call: PictureInPictureViewControllerDelegate {
 extension Call: AppStateDelegate {
     func appDidEnterBackground() {
         Task { [weak self] in
+            try await self?.user.setScreenShare(enabled: false)
             try await self?.webSocketClient.send(message: .init(
                 type: .updateParticipant,
                 data: .updateParticipant(.init(appState: "background"))
