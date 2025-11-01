@@ -17,7 +17,7 @@ final class CameraCaptureOptions: NSObject, VideoCaptureOptions, Sendable {
     let fps: Int
 
     override init() {
-        dimensions = .h720_169
+        dimensions = .h540_169
         fps = 30
     }
 }
