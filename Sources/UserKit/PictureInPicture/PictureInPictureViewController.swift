@@ -38,49 +38,7 @@ final class PictureInPictureViewController: UIViewController {
         return pictureInPictureControllerContentSource
     }()
     
-    private var videoTrack: RTCVideoTrack? {
-        didSet {
-            if let videoTrack = videoTrack {
-                // Use original video resolution to maintain quality
-                // The AVSampleBufferDisplayLayer will handle scaling with resizeAspectFill
-                let frameRenderer = PictureInPictureFrameRender(
-                    displayLayer: pictureInPictureVideoCallViewController.videoDisplayView.sampleBufferDisplayLayer,
-                    flipFrame: true
-                )
-
-                pictureInPictureVideoCallViewController.set(frameRenderer: frameRenderer)
-                videoTrack.add(frameRenderer)
-            } else {
-                if let frameRenderer = pictureInPictureVideoCallViewController.frameRenderer {
-                    frameRenderer.clean()
-                    if let oldTrack = oldValue {
-                        oldTrack.remove(frameRenderer)
-                    }
-                }
-            }
-        }
-    }
-
-    private var localVideoTrack: RTCVideoTrack? {
-        didSet {
-            if let localVideoTrack = localVideoTrack {
-                let localFrameRenderer = PictureInPictureFrameRender(
-                    displayLayer: pictureInPictureVideoCallViewController.localVideoDisplayView.sampleBufferDisplayLayer,
-                    flipFrame: true
-                )
-
-                pictureInPictureVideoCallViewController.set(localFrameRenderer: localFrameRenderer)
-                localVideoTrack.add(localFrameRenderer)
-            } else {
-                if let localFrameRenderer = pictureInPictureVideoCallViewController.localFrameRenderer {
-                    localFrameRenderer.clean()
-                    if let oldTrack = oldValue {
-                        oldTrack.remove(localFrameRenderer)
-                    }
-                }
-            }
-        }
-    }
+    private var videoTracks: [String: RTCVideoTrack] = [:]
 
     // MARK: - Functions
             
@@ -96,71 +54,68 @@ final class PictureInPictureViewController: UIViewController {
         pictureInPictureController.canStartPictureInPictureAutomaticallyFromInline = false
     }
         
-    func set(track: RTCVideoTrack?) {
-        self.videoTrack = track
-    }
+    func set(hosts: [Host], user: User?) {
+        pictureInPictureVideoCallViewController.updateParticipants(hosts: hosts, user: user)
 
-    func set(localTrack: RTCVideoTrack?) {
-        self.localVideoTrack = localTrack
-    }
-
-    func set(host: Host?) {
-        guard let host = host else {
-            return
+        for host in hosts {
+            host.muteDidChange = { [weak self] publication in
+                switch publication.source {
+                case .microphone:
+                    await MainActor.run {
+                        self?.pictureInPictureVideoCallViewController.getParticipantView(for: host.id)?.updateMuteState(isMuted: publication.isMuted)
+                    }
+                case .camera:
+                    await MainActor.run {
+                        self?.pictureInPictureVideoCallViewController.getParticipantView(for: host.id)?.updateCameraState(isEnabled: !publication.isMuted)
+                        if let videoTrack = publication.track?.mediaTrack as? RTCVideoTrack {
+                            self?.setVideoTrack(videoTrack, for: host.id)
+                        } else {
+                            self?.removeVideoTrack(for: host.id)
+                        }
+                    }
+                default:
+                    break
+                }
+            }
         }
 
-        pictureInPictureVideoCallViewController.avatarView.set(backgroundColor: host.avatarColor)
-        pictureInPictureVideoCallViewController.avatarView.set(initials: host.initials)
-        pictureInPictureVideoCallViewController.avatarView.isHidden = host.isCameraEnabled
-        pictureInPictureVideoCallViewController.muteImageView.isHidden = host.isMicrophoneEnabled
-
-        host.muteDidChange = { [weak self] publication in
-            switch publication.kind {
-            case .audio:
-                await MainActor.run {
-                    self?.pictureInPictureVideoCallViewController.muteImageView.isHidden = !publication.isMuted
-                }
-            case .video:
-                await MainActor.run {
-                    self?.pictureInPictureVideoCallViewController.avatarView.isHidden = !publication.isMuted
-                    // Do this somewhere else?
-                    if let videoTrack = publication.track?.mediaTrack as? RTCVideoTrack {
-                        self?.videoTrack = videoTrack
+        if let user = user {
+            user.muteDidChange = { [weak self] publication in
+                switch publication.source {
+                case .microphone:
+                    await MainActor.run {
+                        self?.pictureInPictureVideoCallViewController.getParticipantView(for: user.id)?.updateMuteState(isMuted: publication.isMuted)
                     }
+                case .camera:
+                    await MainActor.run {
+                        self?.pictureInPictureVideoCallViewController.getParticipantView(for: user.id)?.updateCameraState(isEnabled: !publication.isMuted)
+                        if let videoTrack = publication.track?.mediaTrack as? RTCVideoTrack {
+                            self?.setVideoTrack(videoTrack, for: user.id)
+                        } else {
+                            self?.removeVideoTrack(for: user.id)
+                        }
+                    }
+                default:
+                    break
                 }
-            default:
-                break
             }
         }
     }
 
-    func set(user: User?) {
-        guard let user = user else {
-            return
+    private func setVideoTrack(_ track: RTCVideoTrack, for participantId: String) {
+        let oldTrack = videoTracks[participantId]
+        videoTracks[participantId] = track
+
+        if let participantView = pictureInPictureVideoCallViewController.getParticipantView(for: participantId) {
+            participantView.setVideoTrack(track, oldTrack: oldTrack)
         }
+    }
 
-        pictureInPictureVideoCallViewController.localAvatarView.set(backgroundColor: UIColor(red: 0.89, green: 0.47, blue: 0.33, alpha: 1.0))
-        pictureInPictureVideoCallViewController.localAvatarView.set(initials: "You")
-        pictureInPictureVideoCallViewController.localAvatarView.isHidden = user.isCameraEnabled
-        pictureInPictureVideoCallViewController.localMuteImageView.isHidden = user.isMicrophoneEnabled
+    private func removeVideoTrack(for participantId: String) {
+        let oldTrack = videoTracks.removeValue(forKey: participantId)
 
-        user.muteDidChange = { [weak self] publication in
-            switch publication.source {
-            case .microphone:
-                await MainActor.run {
-                    self?.pictureInPictureVideoCallViewController.localMuteImageView.isHidden = !publication.isMuted
-                }
-            case .camera:
-                await MainActor.run {
-                    self?.pictureInPictureVideoCallViewController.localAvatarView.isHidden = !publication.isMuted
-                    // Do this somewhere else?
-                    if let videoTrack = publication.track?.mediaTrack as? RTCVideoTrack {
-                        self?.localVideoTrack = videoTrack
-                    }
-                }
-            default:
-                break
-            }
+        if let participantView = pictureInPictureVideoCallViewController.getParticipantView(for: participantId) {
+            participantView.setVideoTrack(nil, oldTrack: oldTrack)
         }
     }
 }
@@ -225,50 +180,16 @@ class PictureInPictureVideoCallViewController: AVPictureInPictureVideoCallViewCo
 
     // MARK: - Properties
 
-    lazy var videoDisplayView: SampleBufferVideoCallView = {
-        let videoDisplayView = SampleBufferVideoCallView()
-        videoDisplayView.translatesAutoresizingMaskIntoConstraints = false
-        return videoDisplayView
+    private let stackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.distribution = .fillEqually
+        stackView.spacing = 0
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
     }()
 
-    var frameRenderer: PictureInPictureFrameRender?
-
-    var localFrameRenderer: PictureInPictureFrameRender?
-
-    lazy var avatarView: AvatarView = {
-        let avatarView = AvatarView()
-        avatarView.translatesAutoresizingMaskIntoConstraints = false
-        return avatarView
-    }()
-
-    lazy var muteImageView: UIImageView = {
-        let imageView = UIImageView(frame: .zero)
-        imageView.image = UIImage(systemName: "microphone.slash")
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.tintColor = .white
-        return imageView
-    }()
-
-    lazy var localVideoDisplayView: SampleBufferVideoCallView = {
-        let localVideoDisplayView = SampleBufferVideoCallView()
-        localVideoDisplayView.translatesAutoresizingMaskIntoConstraints = false
-        localVideoDisplayView.backgroundColor = .black
-        return localVideoDisplayView
-    }()
-
-    lazy var localAvatarView: AvatarView = {
-        let localAvatarView = AvatarView()
-        localAvatarView.translatesAutoresizingMaskIntoConstraints = false
-        return localAvatarView
-    }()
-    
-    lazy var localMuteImageView: UIImageView = {
-        let imageView = UIImageView(frame: .zero)
-        imageView.image = UIImage(systemName: "microphone.slash")
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.tintColor = .white
-        return imageView
-    }()
+    private var participantViews: [String: ParticipantView] = [:]
 
     // MARK: - Functions
 
@@ -287,64 +208,63 @@ class PictureInPictureVideoCallViewController: AVPictureInPictureVideoCallViewCo
 
         view.backgroundColor = .clear
 
-        view.addSubview(videoDisplayView)
-        view.addSubview(avatarView)
-        view.addSubview(muteImageView)
-        view.addSubview(localVideoDisplayView)
-        view.addSubview(localAvatarView)
-        view.addSubview(localMuteImageView)
+        view.addSubview(stackView)
 
         NSLayoutConstraint.activate([
-            videoDisplayView.topAnchor.constraint(equalTo: view.topAnchor),
-            videoDisplayView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5),
-            videoDisplayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            videoDisplayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-
-        NSLayoutConstraint.activate([
-            avatarView.topAnchor.constraint(equalTo: view.topAnchor),
-            avatarView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5),
-            avatarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            avatarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-
-        NSLayoutConstraint.activate([
-            muteImageView.widthAnchor.constraint(equalToConstant: 22),
-            muteImageView.heightAnchor.constraint(equalToConstant: 22),
-            muteImageView.leadingAnchor.constraint(equalTo: videoDisplayView.leadingAnchor, constant: 8),
-            muteImageView.bottomAnchor.constraint(equalTo: videoDisplayView.bottomAnchor, constant: -8)
-        ])
-
-        NSLayoutConstraint.activate([
-            localVideoDisplayView.topAnchor.constraint(equalTo: videoDisplayView.bottomAnchor),
-            localVideoDisplayView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            localVideoDisplayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            localVideoDisplayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-
-        NSLayoutConstraint.activate([
-            localAvatarView.topAnchor.constraint(equalTo: videoDisplayView.bottomAnchor),
-            localAvatarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            localAvatarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            localAvatarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-        
-        NSLayoutConstraint.activate([
-            localMuteImageView.widthAnchor.constraint(equalToConstant: 22),
-            localMuteImageView.heightAnchor.constraint(equalToConstant: 22),
-            localMuteImageView.leadingAnchor.constraint(equalTo: localVideoDisplayView.leadingAnchor, constant: 8),
-            localMuteImageView.bottomAnchor.constraint(equalTo: localVideoDisplayView.bottomAnchor, constant: -8)
+            stackView.topAnchor.constraint(equalTo: view.topAnchor),
+            stackView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            stackView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
     }
-    
-    func set(frameRenderer: PictureInPictureFrameRender) {
-        self.frameRenderer?.clean()
-        self.frameRenderer = frameRenderer
+
+    func updateParticipants(hosts: [Host], user: User?) {
+        var participants: [Participant] = hosts
+        if let user = user {
+            participants.append(user)
+        }
+
+        let newParticipantIds = Set(participants.map { $0.id })
+        let existingParticipantIds = Set(participantViews.keys)
+
+        let participantsToRemove = existingParticipantIds.subtracting(newParticipantIds)
+        for participantId in participantsToRemove {
+            if let participantView = participantViews[participantId] {
+                UIView.animate(withDuration: 0.3, animations: {
+                    participantView.alpha = 0
+                }) { _ in
+                    participantView.clean()
+                    participantView.removeFromSuperview()
+                }
+                participantViews.removeValue(forKey: participantId)
+            }
+        }
+
+        stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        for participant in participants {
+            let participantView: ParticipantView
+            if let existingView = participantViews[participant.id] {
+                participantView = existingView
+            } else {
+                participantView = ParticipantView()
+                participantView.configure(participant: participant, isLocalUser: participant is User)
+                participantView.alpha = 0
+                participantViews[participant.id] = participantView
+            }
+
+            stackView.addArrangedSubview(participantView)
+
+            if participantView.alpha == 0 {
+                UIView.animate(withDuration: 0.3) {
+                    participantView.alpha = 1
+                }
+            }
+        }
     }
 
-    func set(localFrameRenderer: PictureInPictureFrameRender) {
-        self.localFrameRenderer?.clean()
-        self.localFrameRenderer = localFrameRenderer
+    func getParticipantView(for participantId: String) -> ParticipantView? {
+        return participantViews[participantId]
     }
 }
 

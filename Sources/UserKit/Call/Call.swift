@@ -122,6 +122,8 @@ final class Call {
                         }
 
                         let participants = data?.participants.filter { $0.role == .host } ?? []
+                        var hostsChanged = false
+
                         for participant in participants {
                             if let host = self.state.read({ $0.hosts }).first(where: { $0.id == participant.id }) {
                                 try await host.set(tracks: participant.tracks)
@@ -129,7 +131,17 @@ final class Call {
                                 let host = Host(id: participant.id, firstName: participant.firstName, lastName: participant.lastName, call: self)
                                 self.state.mutate { $0.hosts.append(host) }
                                 try await host.set(tracks: participant.tracks)
+                                hostsChanged = true
                             }
+                        }
+
+                        if hostsChanged {
+                            await self.setPictureInPictureTrack()
+                        }
+
+                        let hosts = self.state.read { $0.hosts }
+                        if hosts.isEmpty {
+                            await self.stopPictureInPicture()
                         }
                     } catch {
                         Logger.debug(logLevel: .error, scope: .core, error: error)
@@ -258,14 +270,15 @@ final class Call {
             switch track.source {
             case .screenShareVideo:
                 await self?.addPictureInPictureViewController()
-                await self?.pictureInPictureViewController?.set(host: self?.state.hosts.first)
-                await self?.pictureInPictureViewController?.set(user: self?.user)
+                let hosts = await self?.state.read { $0.hosts } ?? []
+                await self?.pictureInPictureViewController?.set(hosts: hosts, user: self?.user)
                 try await Task.sleep(nanoseconds: 500_000_000)
                 await self?.startPictureInPicture()
                 await self?.setPictureInPictureTrack()
                 TouchIndicator.enabled = .always
             case .camera:
-                await self?.pictureInPictureViewController?.set(user: self?.user)
+                let hosts = await self?.state.read { $0.hosts } ?? []
+                await self?.pictureInPictureViewController?.set(hosts: hosts, user: self?.user)
             default:
                 break
             }
@@ -337,8 +350,8 @@ final class Call {
 
         async let pictureInPictureTask: Void = {
             await addPictureInPictureViewController()
-            await pictureInPictureViewController?.set(user: user)
-            await pictureInPictureViewController?.set(host: state.hosts.first)
+            let hosts = state.read { $0.hosts }
+            await pictureInPictureViewController?.set(hosts: hosts, user: user)
             await startPictureInPicture()
         }()
 
@@ -484,14 +497,7 @@ extension Call {
     @MainActor
     private func setPictureInPictureTrack() async {
         let hosts = state.read { $0.hosts }
-        for host in hosts {
-            for publication in host.trackPublications.values {
-                if let track = publication.track, track.kind == .video, !track.isMuted, let videoTrack = track.mediaTrack as? RTCVideoTrack {
-                    pictureInPictureViewController?.set(track: videoTrack)
-                    return
-                }
-            }
-        }
+        await pictureInPictureViewController?.set(hosts: hosts, user: user)
     }
     
     @MainActor
