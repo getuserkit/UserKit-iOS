@@ -552,6 +552,12 @@ extension Call: PictureInPictureViewControllerDelegate {
         }
                 
         await presentAlert(title: "Continue Call", message: "You are in a call with Peter", options: [
+            UIAlertAction(title: user.isMicrophoneEnabled ? "Mute Mic" : "Enable Mic", style: .default) { [weak self] alertAction in
+                Task {
+                    try await self?.user.setMicrophone(enabled: (self?.user.isMicrophoneEnabled ?? true) ? false : true)
+                    await self?.startPictureInPicture()
+                }
+            },
             UIAlertAction(title: user.isCameraEnabled ? "Disable Camera" : "Enable Camera", style: .default) { [weak self] alertAction in
                 Task {
                     try await self?.user.setCamera(enabled: (self?.user.isCameraEnabled ?? true) ? false : true)
