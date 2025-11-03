@@ -8,7 +8,7 @@
 import Foundation
 
 //let baseURL = "http://localhost:3000"
-let baseURL = "https://getuserkit.com"
+let baseURL = "https://app.getuserkit.com"
 
 enum NetworkError: LocalizedError {
     case notAuthenticated

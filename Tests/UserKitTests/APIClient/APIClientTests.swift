@@ -7,42 +7,42 @@ final class APIClientTests: XCTestCase {
         let request = APIClient.ConfigurationRequest()
         let route = APIClient.Route.configuration(request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/configuration")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/configuration")
     }
 
     func testPostUserRouteURL() throws {
         let request = APIClient.UserRequest(id: "123", name: "Test", email: "test@example.com", appVersion: "1.0")
         let route = APIClient.Route.postUser(request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/users")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/users")
     }
 
     func testPostDeviceRouteURL() throws {
         let request = APIClient.PostDeviceRequest(voipToken: "abc123")
         let route = APIClient.Route.postDevice(request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/devices")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/devices")
     }
 
     func testResetRouteURL() throws {
         let request = APIClient.ResetRequest()
         let route = APIClient.Route.reset(request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/resets")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/resets")
     }
 
     func testPostSessionRouteURL() throws {
         let request = APIClient.PostSessionRequest()
         let route = APIClient.Route.postSession(request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/calls/sessions/new")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/calls/sessions/new")
     }
 
     func testPullTracksRouteURL() throws {
         let request = APIClient.PullTracksRequest(tracks: [])
         let route = APIClient.Route.pullTracks("session-123", request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/calls/sessions/session-123/tracks/new")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/calls/sessions/session-123/tracks/new")
     }
 
     func testPushTracksRouteURL() throws {
@@ -50,7 +50,7 @@ final class APIClientTests: XCTestCase {
         let request = APIClient.PushTracksRequest(sessionDescription: sessionDesc, tracks: [])
         let route = APIClient.Route.pushTracks("session-456", request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/calls/sessions/session-456/tracks/new")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/calls/sessions/session-456/tracks/new")
     }
 
     func testRenegotiateRouteURL() throws {
@@ -58,7 +58,7 @@ final class APIClientTests: XCTestCase {
         let request = APIClient.RenegotiateRequest(sessionDescription: sessionDesc)
         let route = APIClient.Route.renegotiate("session-789", request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/calls/sessions/session-789/renegotiate")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/calls/sessions/session-789/renegotiate")
     }
 
     func testAcceptRouteURL() throws {
@@ -83,7 +83,7 @@ final class APIClientTests: XCTestCase {
         let request = APIClient.EnqueueRequest(reason: "Support", preferredCallTime: "2025-01-01T10:00:00Z")
         let route = APIClient.Route.enqueue(request)
 
-        XCTAssertEqual(route.url, "https://getuserkit.com/api/v1/entries")
+        XCTAssertEqual(route.url, "https://app.getuserkit.com/api/v1/entries")
     }
 
     func testConfigurationRouteMethod() throws {
