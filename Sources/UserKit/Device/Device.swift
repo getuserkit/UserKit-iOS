@@ -69,7 +69,7 @@ struct Device {
         }
     }
     
-    private let reachability = SCNetworkReachabilityCreateWithName(kCFAllocatorDefault, "getuserkit.com")
+    private let reachability = SCNetworkReachabilityCreateWithName(kCFAllocatorDefault, "app.getuserkit.com")
     
     var reachabilityFlags: SCNetworkReachabilityFlags? {
       guard let reachability = reachability else {
