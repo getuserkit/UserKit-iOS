@@ -138,18 +138,6 @@ class VideoCapturerDelegateAdapter: NSObject, RTCVideoCapturerDelegate {
     func capturer(_ capturer: RTCVideoCapturer, didCapture frame: RTCVideoFrame) {
         guard let cameraCapturer else { return }
 
-        var frame = frame
-        let adaptOutputFormatEnabled = (frame.width != cameraCapturer.options.dimensions.width || frame.height != cameraCapturer.options.dimensions.height)
-        if adaptOutputFormatEnabled {
-            let rotatedDimensions = cameraCapturer.options.dimensions.apply(rotation: frame.rotation)
-            if let newFrame = frame.cropAndScaleFromCenter(targetWidth: rotatedDimensions.width,
-                                                           targetHeight: rotatedDimensions.height)
-            {
-                frame = newFrame
-            }
-        }
-
-        // Pass frame to video source
         cameraCapturer.capture(frame: frame, capturer: capturer, device: cameraCapturer.device, options: cameraCapturer.options)
     }
 }
