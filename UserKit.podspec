@@ -15,6 +15,5 @@ UserKit makes it effortless to have real, face-to-face conversations with your u
 
   s.source_files = 'Sources/UserKit/**/*.swift'
 
-  # WebRTC dependency
   s.dependency 'GoogleWebRTC', '125.6422.07'
 end
