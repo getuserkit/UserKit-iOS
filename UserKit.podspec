@@ -2,9 +2,7 @@ Pod::Spec.new do |s|
   s.name             = 'UserKit'
   s.version          = '1.1.0'
   s.summary          = 'UserKit: Everything you need to talk to your users'
-  s.description      = <<-DESC
-UserKit makes it effortless to have real, face-to-face conversations with your users, right inside your app
-                       DESC
+  s.description      = 'UserKit makes it effortless to have real, face-to-face conversations with your users, right inside your app'
   s.homepage         = 'https://github.com/getuserkit/UserKit-iOS'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
   s.author           = { 'Peter Nicholls' => 'pete@getuserkit.com' }
