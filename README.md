@@ -40,7 +40,7 @@ The preferred installation method is with [Swift Package Manager](https://swift.
 
 - Select **File ▸ Add Packages...**
 - Search for `https://github.com/getuserkit/userkit-ios` in the search bar.
-- Set the **Dependency Rule** to **Up to Next Major Version** with the lower bound set to **1.0.0**.
+- Set the **Dependency Rule** to **Up to Next Major Version** with the lower bound set to **1.1.0**.
 - Make sure your project name is selected in **Add to Project**.
 - Then, **Add Package**.
 
