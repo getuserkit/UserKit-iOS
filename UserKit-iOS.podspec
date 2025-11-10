@@ -9,6 +9,7 @@ Pod::Spec.new do |s|
   s.source           = { :git => 'https://github.com/getuserkit/UserKit-iOS.git', :tag => s.version.to_s }
   s.ios.deployment_target = '15.0'
   s.swift_version = '5.10'
+  s.module_name = 'UserKit'
   s.source_files = 'Sources/UserKit/**/*.swift'
   s.dependency 'WebRTC-SDK', '=125.6422.07'
 end
