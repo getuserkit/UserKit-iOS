@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'UserKit'
-  s.version          = '1.1.0'
+  s.version          = '1.1.1'
   s.summary          = 'UserKit: Everything you need to talk to your users'
   s.description      = 'UserKit makes it effortless to have real, face-to-face conversations with your users, right inside your app'
   s.homepage         = 'https://github.com/getuserkit/UserKit-iOS'
