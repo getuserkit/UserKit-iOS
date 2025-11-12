@@ -62,6 +62,14 @@ enum Logger: Loggable {
                 return
             }
 
+            await UserKit.shared.delegate?.handleLog(
+                level: logLevel.stringValue,
+                scope: scope.stringValue,
+                message: message,
+                info: info,
+                error: error
+            )
+
             var name = "\(Date().isoString) \(logLevel.descriptionEmoji) [UserKit] [\(scope.description)] - \(logLevel.description)"
 
             if let message = message {
