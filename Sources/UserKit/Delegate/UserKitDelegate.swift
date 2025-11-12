@@ -1,8 +1,7 @@
 import Foundation
 
-@MainActor
 public protocol UserKitDelegate: AnyObject {
-    func handleLog(
+    @MainActor func handleLog(
         level: String,
         scope: String,
         message: String?,
@@ -12,7 +11,7 @@ public protocol UserKitDelegate: AnyObject {
 }
 
 extension UserKitDelegate {
-    public func handleLog(
+    @MainActor public func handleLog(
         level: String,
         scope: String,
         message: String?,
