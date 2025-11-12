@@ -24,4 +24,17 @@ public enum LogScope: Int, Encodable, Sendable, CustomStringConvertible {
             return "PushKit"
         }
     }
+
+    var stringValue: String {
+        switch self {
+        case .all:
+            return "all"
+        case .core:
+            return "core"
+        case .network:
+            return "network"
+        case .pushKit:
+            return "pushKit"
+        }
+    }
 }

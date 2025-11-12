@@ -46,6 +46,8 @@ public final class UserKit: NSObject {
         }
     }
 
+    public weak var delegate: UserKitDelegate?
+
     var options: UserKitOptions {
       return configManager.options
     }
