@@ -1,6 +1,6 @@
 <h1 align="center">UserKit</h1>
 
-<h3 style="font-size:26" align="center">Everything you need to talk to your users</h3>
+<h3 style="font-size:26" align="center">Talk to your users, right inside your app.</h3>
 
 <p align="center">
   <a href="https://docs.superwall.com/docs/installation-via-spm">
@@ -19,7 +19,7 @@
 
 ---
 
-[UserKit](https://getuserkit.com/) gives you need to have real conversations with your users – right inside your app.
+A simple SDK that helps to your team talk to your users whenever they need it.
 
 ## Features
 
