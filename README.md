@@ -21,6 +21,12 @@
 
 Start a call, view their screen, see where they tap, and solve problems instantly inside your own app all with 3 lines of code.
 
+## Demo
+
+<p align="center">
+  <img src="demo.gif" alt="UserKit Demo">
+</p>
+
 ## Features
 
 |     | UserKit                                                                                                  |
