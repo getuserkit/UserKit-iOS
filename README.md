@@ -19,7 +19,7 @@
 
 ---
 
-A simple SDK that helps to your team talk to your users.
+Start a call, view their screen, see where they tap, and solve problems instantly inside your own app all with 3 lines of code.
 
 ## Features
 
