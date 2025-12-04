@@ -65,7 +65,7 @@ UserKit.shared.identify(id: "1", name: "Example User", email: "example@user.com"
 
 That's all that is required!
 
-Now you can jump over to [getuserkit.com](https://getuserkit.com), find your logged in user and give them a call.
+Now you can jump over to [getuserkit.com](https://getuserkit.com), find your identified user and give them a call.
 
 ## 🤝 Contributing
 
