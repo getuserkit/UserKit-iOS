@@ -19,7 +19,7 @@
 
 ---
 
-A simple SDK that helps to your team talk to your users whenever they need it.
+A simple SDK that helps to your team talk to your users.
 
 ## Features
 
