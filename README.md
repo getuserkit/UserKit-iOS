@@ -33,7 +33,7 @@ Start a call, view their screen, see where they tap, and solve problems instantl
 | --- | -------------------------------------------------------------------------------------------------------- |
 | 🖼️  | UserKit runs entirely inside a native Picture in Picture window, keeping your app’s interface untouched. |
 | 🖥️  | Watch how users actually use your app. See their screen and touches, live and in context.                |
-| 👍  | No permissions request request required                                                                  |
+| 👍  | No permissions request required                                                                          |
 | 📞  | Full CallKit integration built in.                                                                       |
 | 📝  | [Online documentation](https://docs.getuserkit.com) up to date                                           |
 | 💯  | Well maintained - [frequent releases](https://github.com/getuserkit/UserKit-iOS/releases)                |
